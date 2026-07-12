@@ -14,13 +14,22 @@ public class EventController {
     }
 
     @GetMapping
-    public List<Event> getAllEvents() {
-        return eventRepository.findAll();
+    public List<Event> getAllEvents(@RequestParam(required = false) String name,
+                                    @RequestParam(required = false) EventStatus status) {
+        if (name == null && status == null)
+            return eventRepository.findAll();
+        else if (name == null)
+            return eventRepository.findByStatus(status);
+        else if (status == null)
+            return eventRepository.findByNameContainingIgnoreCase(name);
+        else
+            return eventRepository.findByNameContainingIgnoreCaseAndStatus(name, status);
     }
 
     @GetMapping("/{id}")
     public Event getEventById(@PathVariable Long id) {
-        return eventRepository.findById(id).orElseThrow(() -> new RuntimeException("Event not found: " + id));
+        return eventRepository.findById(id)
+                              .orElseThrow(() -> new RuntimeException("Event not found: " + id));
     }
 }
 

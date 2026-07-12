@@ -48,6 +48,45 @@ class EventControllerTest {
     }
 
     @Test
+    void getAllEventsFiltersByNameWhenOnlyNameGiven() throws Exception {
+        Event event = new Event();
+        event.setId(1L);
+        event.setName("Summer Jam");
+        when(eventRepository.findByNameContainingIgnoreCase("summer")).thenReturn(List.of(event));
+
+        mockMvc.perform(get("/events").param("name", "summer"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].name").value("Summer Jam"));
+    }
+
+    @Test
+    void getAllEventsFiltersByStatusWhenOnlyStatusGiven() throws Exception {
+        Event event = new Event();
+        event.setId(1L);
+        event.setStatus(EventStatus.ON_SALE);
+        when(eventRepository.findByStatus(EventStatus.ON_SALE)).thenReturn(List.of(event));
+
+        mockMvc.perform(get("/events").param("status", "ON_SALE"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].status").value("ON_SALE"));
+    }
+
+    @Test
+    void getAllEventsFiltersByNameAndStatusWhenBothGiven() throws Exception {
+        Event event = new Event();
+        event.setId(1L);
+        event.setName("Summer Jam");
+        event.setStatus(EventStatus.ON_SALE);
+        when(eventRepository.findByNameContainingIgnoreCaseAndStatus("summer", EventStatus.ON_SALE))
+                .thenReturn(List.of(event));
+
+        mockMvc.perform(get("/events").param("name", "summer").param("status", "ON_SALE"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].name").value("Summer Jam"))
+                .andExpect(jsonPath("$[0].status").value("ON_SALE"));
+    }
+
+    @Test
     void getEventByIdReturnsEventWhenFound() throws Exception {
         Event event = new Event();
         event.setId(1L);
