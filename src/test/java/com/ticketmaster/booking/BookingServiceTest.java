@@ -160,6 +160,41 @@ class BookingServiceTest {
     }
 
     @Test
+    void cancelsAPendingBookingAndReleasesItsTickets() {
+        User user = saveUser();
+        Event event = saveEvent();
+        Ticket ticket = saveTicket(event, "1", 100);
+        Booking booking = bookingService.hold(user.getId(), event.getId(), List.of(ticket.getId()), "idem-cancel-1");
+
+        Booking cancelled = bookingService.cancel(booking.getId());
+
+        assertThat(cancelled.getStatus()).isEqualTo(BookingStatus.CANCELLED);
+        assertThat(ticketRepository.findById(ticket.getId()))
+                .isPresent()
+                .get()
+                .extracting(Ticket::getStatus)
+                .isEqualTo(TicketStatus.AVAILABLE);
+    }
+
+    @Test
+    void throwsWhenCancellingABookingThatIsNotPending() {
+        User user = saveUser();
+        Event event = saveEvent();
+        Ticket ticket = saveTicket(event, "1", 100);
+        Booking booking = bookingService.hold(user.getId(), event.getId(), List.of(ticket.getId()), "idem-cancel-2");
+        bookingService.confirm(booking.getId());
+
+        assertThatThrownBy(() -> bookingService.cancel(booking.getId()))
+                .isInstanceOf(InvalidBookingState.class);
+    }
+
+    @Test
+    void throwsWhenCancellingANonexistentBooking() {
+        assertThatThrownBy(() -> bookingService.cancel(999L))
+                .isInstanceOf(NoSuchElementException.class);
+    }
+
+    @Test
     void confirmsAPendingBookingAndBooksItsTickets() {
         User user = saveUser();
         Event event = saveEvent();

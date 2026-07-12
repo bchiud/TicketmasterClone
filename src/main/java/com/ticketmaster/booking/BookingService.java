@@ -19,6 +19,7 @@ import java.time.Instant;
 import java.time.ZonedDateTime;
 import java.util.List;
 import java.util.NoSuchElementException;
+import java.util.Optional;
 
 @Service
 @Slf4j  // lombok generates LoggerFactory.getLogger()
@@ -44,42 +45,44 @@ public class BookingService {
     @Transactional
     public Booking hold(Long userId, Long eventId, List<Long> ticketIds, String idempotencyKey) {
         // 1. check if booking exists
-        Booking booking = bookingRepository.findByIdempotencyKey(idempotencyKey);
-        if (booking != null) return booking;
+        Optional<Booking> optionalBooking = bookingRepository.findByIdempotencyKey(idempotencyKey);
+        return optionalBooking.orElseGet(() -> {
+            // 2. lock tickets
+            List<Ticket> tickets = ticketRepository.findByIdIn(ticketIds);
+            if (tickets.size() != ticketIds.size()) throw new TicketUnavailableException();
 
-        // 2. lock tickets
-        List<Ticket> tickets = ticketRepository.findByIdIn(ticketIds);
-        if (tickets.size() != ticketIds.size()) throw new TicketUnavailableException();
+            // 3. validate availability
+            for (Ticket ticket : tickets)
+                if (ticket.getStatus() != TicketStatus.AVAILABLE) throw new TicketUnavailableException(
+                        "Ticket %d unavailable".formatted(ticket.getId()));
 
-        // 3. validate availability
-        for (Ticket ticket : tickets)
-            if (ticket.getStatus() != TicketStatus.AVAILABLE) throw new TicketUnavailableException(
-                    "Ticket %d unavailable".formatted(ticket.getId()));
+            // 4. hold tickets
+            ZonedDateTime expiresAt = ZonedDateTime.now()
+                                                   .plusMinutes(10);
+            int totalCents = 0;
+            for (Ticket ticket : tickets) {
+                ticket.setStatus(TicketStatus.HELD);
+                ticket.setHoldExpiresAt(expiresAt);
+                totalCents += ticket.getPriceCents();
+            }
+            ticketRepository.saveAll(tickets);
 
-        // 4. hold tickets
-        ZonedDateTime expiresAt = ZonedDateTime.now()
-                                               .plusMinutes(10);
-        int totalCents = 0;
-        for (Ticket ticket : tickets) {
-            ticket.setStatus(TicketStatus.HELD);
-            ticket.setHoldExpiresAt(expiresAt);
-            totalCents += ticket.getPriceCents();
-        }
-        ticketRepository.saveAll(tickets);
-
-        // 5. book!
-        booking = new Booking();
-        booking.setUser(userRepository.findById(userId)
-                                      .orElseThrow(() -> new NoSuchElementException("User not found: " + userId)));
-        booking.setEvent(eventRepository.findById(eventId)
-                                        .orElseThrow(() -> new NoSuchElementException("Event not found: " + eventId)));
-        booking.setTickets(tickets);
-        booking.setStatus(BookingStatus.PENDING);
-        booking.setTotalCents(totalCents);
-        booking.setIdempotencyKey(idempotencyKey);
-        booking.setExpiresAt(expiresAt.toInstant());
-        bookingRepository.save(booking);
-        return booking;
+            // 5. book!
+            Booking booking = new Booking();
+            booking.setUser(userRepository.findById(userId)
+                                          .orElseThrow(
+                                                  () -> new NoSuchElementException("User not found: " + userId)));
+            booking.setEvent(eventRepository.findById(eventId)
+                                            .orElseThrow(() -> new NoSuchElementException(
+                                                    "Event not found: " + eventId)));
+            booking.setTickets(tickets);
+            booking.setStatus(BookingStatus.PENDING);
+            booking.setTotalCents(totalCents);
+            booking.setIdempotencyKey(idempotencyKey);
+            booking.setExpiresAt(expiresAt.toInstant());
+            bookingRepository.save(booking);
+            return booking;
+        });
     }
 
     @Transactional
@@ -128,5 +131,24 @@ public class BookingService {
                 log.error("Failed to expire booking {}", booking.getId(), e);
             }
         }
+    }
+
+    @Transactional
+    public Booking cancel(long bookingId) {
+        Booking booking = bookingRepository.findById(bookingId)
+                         .orElseThrow(() -> new NoSuchElementException("Booking not found: " + bookingId));
+
+        if (booking.getStatus() != BookingStatus.PENDING)
+            throw new InvalidBookingState("Booking not pending");
+
+        booking.setStatus(BookingStatus.CANCELLED);
+        for (Ticket ticket : booking.getTickets()) {
+            ticket.setStatus(TicketStatus.AVAILABLE);
+            ticket.setHoldExpiresAt(null);
+        }
+        ticketRepository.saveAll(booking.getTickets());
+        bookingRepository.save(booking);
+
+        return booking;
     }
 }

@@ -18,6 +18,7 @@ import org.springframework.boot.jdbc.test.autoconfigure.AutoConfigureTestDatabas
 import java.time.Instant;
 import java.time.ZonedDateTime;
 import java.util.List;
+import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -113,11 +114,12 @@ class BookingRepositoryTest {
         Event event = saveEvent(venue);
         bookingRepository.save(newBooking(user, event, "idem-2"));
 
-        Booking found = bookingRepository.findByIdempotencyKey("idem-2");
+        Optional<Booking> found = bookingRepository.findByIdempotencyKey("idem-2");
 
-        assertThat(found).isNotNull();
-        assertThat(found.getUser()
-                         .getEmail()).isEqualTo("alice@example.com");
+        assertThat(found).isPresent();
+        assertThat(found.get()
+                        .getUser()
+                        .getEmail()).isEqualTo("alice@example.com");
     }
 
     @Test

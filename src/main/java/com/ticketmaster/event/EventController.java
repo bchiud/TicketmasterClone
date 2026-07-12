@@ -30,7 +30,7 @@ public class EventController {
     @GetMapping("/{id}")
     public Event getEventById(@PathVariable Long id) {
         return eventRepository.findById(id)
-                              .orElseThrow(() -> new NoSuchElementException("Event not found: " + id));
+                                  .orElseThrow(() -> new NoSuchElementException("Event not found: " + id));
     }
 }
 

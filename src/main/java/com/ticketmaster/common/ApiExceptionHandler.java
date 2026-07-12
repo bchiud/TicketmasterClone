@@ -4,10 +4,12 @@ import com.ticketmaster.booking.InvalidBookingState;
 import com.ticketmaster.ticket.TicketUnavailableException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 import java.util.NoSuchElementException;
+import java.util.stream.Collectors;
 
 @RestControllerAdvice
 public class ApiExceptionHandler {
@@ -24,8 +26,20 @@ public class ApiExceptionHandler {
     }
 
     @ExceptionHandler(InvalidBookingState.class)
-    public ResponseEntity<String> handleInvalidBookingState(InvalidBookingState ex){
+    public ResponseEntity<String> handleInvalidBookingState(InvalidBookingState ex) {
         return ResponseEntity.status(HttpStatus.CONFLICT)
                              .body(ex.getMessage());
+    }
+
+    // request body validation exception
+    @ExceptionHandler(MethodArgumentNotValidException.class)
+    public ResponseEntity<String> handleException(MethodArgumentNotValidException ex) {
+        String message = ex.getBindingResult()
+                           .getFieldErrors()  // List<FieldError> of constraint violations
+                           .stream()
+                           .map(err -> err.getField() + " " + err.getDefaultMessage())
+                           .collect(Collectors.joining(", "));
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                             .body(message);
     }
 }
