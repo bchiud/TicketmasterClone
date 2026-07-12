@@ -44,7 +44,8 @@ class TicketRepositoryTest {
         Event event = new Event();
         event.setName("Test Concert");
         event.setVenue(venue);
-        event.setStartsAt(ZonedDateTime.now().plusDays(30));
+        event.setStartsAt(ZonedDateTime.now()
+                                       .plusDays(30));
         return eventRepository.save(event);
     }
 

@@ -31,8 +31,8 @@ class SeatControllerTest {
         when(seatRepository.findById(1L)).thenReturn(Optional.of(seat));
 
         mockMvc.perform(get("/seats/1"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.section").value("A"));
+               .andExpect(status().isOk())
+               .andExpect(jsonPath("$.section").value("A"));
     }
 
     @Test
@@ -40,7 +40,7 @@ class SeatControllerTest {
         when(seatRepository.findById(99L)).thenReturn(Optional.empty());
 
         mockMvc.perform(get("/seats/99"))
-                .andExpect(status().isNotFound());
+               .andExpect(status().isNotFound());
     }
 
     @Test
@@ -51,7 +51,7 @@ class SeatControllerTest {
         when(seatRepository.findByVenueId(5L)).thenReturn(List.of(seat));
 
         mockMvc.perform(get("/venues/5/seats"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$[0].section").value("B"));
+               .andExpect(status().isOk())
+               .andExpect(jsonPath("$[0].section").value("B"));
     }
 }

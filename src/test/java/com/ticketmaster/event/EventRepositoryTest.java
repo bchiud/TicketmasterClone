@@ -38,7 +38,8 @@ class EventRepositoryTest {
         event.setName("Taylor Swift: The Eras Tour");
         event.setPerformer("Taylor Swift");
         event.setVenue(venue);
-        event.setStartsAt(ZonedDateTime.now().plusMonths(1));
+        event.setStartsAt(ZonedDateTime.now()
+                                       .plusMonths(1));
 
         Event saved = eventRepository.save(event);
 
@@ -53,13 +54,15 @@ class EventRepositoryTest {
         Event event = new Event();
         event.setName("Concert Night");
         event.setVenue(venue);
-        event.setStartsAt(ZonedDateTime.now().plusDays(10));
+        event.setStartsAt(ZonedDateTime.now()
+                                       .plusDays(10));
         eventRepository.save(event);
 
         List<Event> results = eventRepository.findByVenueId(venue.getId());
 
         assertThat(results).hasSize(1);
-        assertThat(results.get(0).getName()).isEqualTo("Concert Night");
+        assertThat(results.get(0)
+                          .getName()).isEqualTo("Concert Night");
     }
 
     @Test
@@ -69,13 +72,15 @@ class EventRepositoryTest {
         Event event = new Event();
         event.setName("On Sale Show");
         event.setVenue(venue);
-        event.setStartsAt(ZonedDateTime.now().plusDays(5));
+        event.setStartsAt(ZonedDateTime.now()
+                                       .plusDays(5));
         event.setStatus(EventStatus.ON_SALE);
         eventRepository.save(event);
 
         List<Event> results = eventRepository.findByStatus(EventStatus.ON_SALE);
 
-        assertThat(results).extracting(Event::getName).contains("On Sale Show");
+        assertThat(results).extracting(Event::getName)
+                           .contains("On Sale Show");
     }
 
     @Test
@@ -85,11 +90,13 @@ class EventRepositoryTest {
         Event event = new Event();
         event.setName("Summer Jam Festival");
         event.setVenue(venue);
-        event.setStartsAt(ZonedDateTime.now().plusDays(20));
+        event.setStartsAt(ZonedDateTime.now()
+                                       .plusDays(20));
         eventRepository.save(event);
 
         List<Event> results = eventRepository.findByNameContainingIgnoreCase("summer");
 
-        assertThat(results).extracting(Event::getName).contains("Summer Jam Festival");
+        assertThat(results).extracting(Event::getName)
+                           .contains("Summer Jam Festival");
     }
 }

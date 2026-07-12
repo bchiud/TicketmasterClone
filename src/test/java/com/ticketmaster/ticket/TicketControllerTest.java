@@ -31,8 +31,8 @@ class TicketControllerTest {
         when(ticketRepository.findById(1L)).thenReturn(Optional.of(ticket));
 
         mockMvc.perform(get("/tickets/1"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.priceCents").value(5000));
+               .andExpect(status().isOk())
+               .andExpect(jsonPath("$.priceCents").value(5000));
     }
 
     @Test
@@ -40,7 +40,7 @@ class TicketControllerTest {
         when(ticketRepository.findById(99L)).thenReturn(Optional.empty());
 
         mockMvc.perform(get("/tickets/99"))
-                .andExpect(status().isNotFound());
+               .andExpect(status().isNotFound());
     }
 
     @Test
@@ -50,8 +50,8 @@ class TicketControllerTest {
         when(ticketRepository.findByEventId(3L)).thenReturn(List.of(ticket));
 
         mockMvc.perform(get("/events/3/tickets"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$[0].id").value(1));
+               .andExpect(status().isOk())
+               .andExpect(jsonPath("$[0].id").value(1));
     }
 
     @Test
@@ -62,7 +62,7 @@ class TicketControllerTest {
         when(ticketRepository.findByEventIdAndStatus(3L, TicketStatus.AVAILABLE)).thenReturn(List.of(ticket));
 
         mockMvc.perform(get("/events/3/tickets").param("status", "AVAILABLE"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$[0].id").value(2));
+               .andExpect(status().isOk())
+               .andExpect(jsonPath("$[0].id").value(2));
     }
 }

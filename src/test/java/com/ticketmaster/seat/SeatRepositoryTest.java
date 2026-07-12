@@ -59,6 +59,7 @@ class SeatRepositoryTest {
         List<Seat> results = seatRepository.findByVenueId(venue.getId());
 
         assertThat(results).hasSize(1);
-        assertThat(results.get(0).getSection()).isEqualTo("B");
+        assertThat(results.get(0)
+                          .getSection()).isEqualTo("B");
     }
 }

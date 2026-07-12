@@ -11,9 +11,7 @@ import java.util.Optional;
 
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @WebMvcTest(EventController.class)
 class EventControllerTest {
@@ -29,8 +27,8 @@ class EventControllerTest {
         when(eventRepository.findAll()).thenReturn(List.of());
 
         mockMvc.perform(get("/events"))
-                .andExpect(status().isOk())
-                .andExpect(content().json("[]"));
+               .andExpect(status().isOk())
+               .andExpect(content().json("[]"));
     }
 
     @Test
@@ -41,8 +39,8 @@ class EventControllerTest {
         when(eventRepository.findAll()).thenReturn(List.of(event));
 
         mockMvc.perform(get("/events"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$[0].name").value("Test Concert"));
+               .andExpect(status().isOk())
+               .andExpect(jsonPath("$[0].name").value("Test Concert"));
     }
 
     @Test
@@ -53,8 +51,8 @@ class EventControllerTest {
         when(eventRepository.findByNameContainingIgnoreCase("summer")).thenReturn(List.of(event));
 
         mockMvc.perform(get("/events").param("name", "summer"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$[0].name").value("Summer Jam"));
+               .andExpect(status().isOk())
+               .andExpect(jsonPath("$[0].name").value("Summer Jam"));
     }
 
     @Test
@@ -65,8 +63,8 @@ class EventControllerTest {
         when(eventRepository.findByStatus(EventStatus.ON_SALE)).thenReturn(List.of(event));
 
         mockMvc.perform(get("/events").param("status", "ON_SALE"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$[0].status").value("ON_SALE"));
+               .andExpect(status().isOk())
+               .andExpect(jsonPath("$[0].status").value("ON_SALE"));
     }
 
     @Test
@@ -78,10 +76,11 @@ class EventControllerTest {
         when(eventRepository.findByNameContainingIgnoreCaseAndStatus("summer", EventStatus.ON_SALE))
                 .thenReturn(List.of(event));
 
-        mockMvc.perform(get("/events").param("name", "summer").param("status", "ON_SALE"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$[0].name").value("Summer Jam"))
-                .andExpect(jsonPath("$[0].status").value("ON_SALE"));
+        mockMvc.perform(get("/events").param("name", "summer")
+                                      .param("status", "ON_SALE"))
+               .andExpect(status().isOk())
+               .andExpect(jsonPath("$[0].name").value("Summer Jam"))
+               .andExpect(jsonPath("$[0].status").value("ON_SALE"));
     }
 
     @Test
@@ -92,8 +91,8 @@ class EventControllerTest {
         when(eventRepository.findById(1L)).thenReturn(Optional.of(event));
 
         mockMvc.perform(get("/events/1"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.name").value("Test Concert"));
+               .andExpect(status().isOk())
+               .andExpect(jsonPath("$.name").value("Test Concert"));
     }
 
     @Test
@@ -101,6 +100,6 @@ class EventControllerTest {
         when(eventRepository.findById(99L)).thenReturn(Optional.empty());
 
         mockMvc.perform(get("/events/99"))
-                .andExpect(status().isNotFound());
+               .andExpect(status().isNotFound());
     }
 }

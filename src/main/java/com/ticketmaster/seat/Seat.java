@@ -27,6 +27,4 @@ public class Seat {
     private String rowLabel;
 
     private String seatNumber;
-
-
 }

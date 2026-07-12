@@ -11,9 +11,7 @@ import java.util.Optional;
 
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @WebMvcTest(VenueController.class)
 class VenueControllerTest {
@@ -29,8 +27,8 @@ class VenueControllerTest {
         when(venueRepository.findAll()).thenReturn(List.of());
 
         mockMvc.perform(get("/venues"))
-                .andExpect(status().isOk())
-                .andExpect(content().json("[]"));
+               .andExpect(status().isOk())
+               .andExpect(content().json("[]"));
     }
 
     @Test
@@ -41,8 +39,8 @@ class VenueControllerTest {
         when(venueRepository.findAll()).thenReturn(List.of(venue));
 
         mockMvc.perform(get("/venues"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$[0].name").value("Chase Center"));
+               .andExpect(status().isOk())
+               .andExpect(jsonPath("$[0].name").value("Chase Center"));
     }
 
     @Test
@@ -53,8 +51,8 @@ class VenueControllerTest {
         when(venueRepository.findById(1L)).thenReturn(Optional.of(venue));
 
         mockMvc.perform(get("/venues/1"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.name").value("Chase Center"));
+               .andExpect(status().isOk())
+               .andExpect(jsonPath("$.name").value("Chase Center"));
     }
 
     @Test
@@ -62,6 +60,6 @@ class VenueControllerTest {
         when(venueRepository.findById(99L)).thenReturn(Optional.empty());
 
         mockMvc.perform(get("/venues/99"))
-                .andExpect(status().isNotFound());
+               .andExpect(status().isNotFound());
     }
 }
