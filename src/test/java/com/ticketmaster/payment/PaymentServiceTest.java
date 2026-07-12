@@ -115,8 +115,8 @@ class PaymentServiceTest {
                 .isEqualTo(TicketStatus.BOOKED);
 
         assertThat(paymentRepository.findByBookingId(booking.getId()))
-                .isPresent()
-                .get()
+                .hasSize(1)
+                .first()
                 .satisfies(payment -> {
                     assertThat(payment.getStatus()).isEqualTo(PaymentStatus.SUCCEEDED);
                     assertThat(payment.getAmountCents()).isEqualTo(150);

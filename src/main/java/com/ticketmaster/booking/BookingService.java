@@ -17,6 +17,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 
 import java.time.Instant;
 import java.time.ZonedDateTime;
+import java.util.EnumSet;
 import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.Optional;
@@ -138,8 +139,9 @@ public class BookingService {
         Booking booking = bookingRepository.findById(bookingId)
                          .orElseThrow(() -> new NoSuchElementException("Booking not found: " + bookingId));
 
-        if (booking.getStatus() != BookingStatus.PENDING)
-            throw new InvalidBookingState("Booking not pending");
+        // BookingStatus.CONFIRMED for refund flow
+        if (!EnumSet.of(BookingStatus.PENDING, BookingStatus.CONFIRMED).contains(booking.getStatus()))
+            throw new InvalidBookingState("Booking not pending or confirmed");
 
         booking.setStatus(BookingStatus.CANCELLED);
         for (Ticket ticket : booking.getTickets()) {
