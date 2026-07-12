@@ -36,6 +36,14 @@ class SeatControllerTest {
     }
 
     @Test
+    void getSeatReturns404WhenNotFound() throws Exception {
+        when(seatRepository.findById(99L)).thenReturn(Optional.empty());
+
+        mockMvc.perform(get("/seats/99"))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
     void getSeatsReturnsSeatsForVenue() throws Exception {
         Seat seat = new Seat();
         seat.setId(1L);

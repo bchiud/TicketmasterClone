@@ -3,6 +3,7 @@ package com.ticketmaster.event;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.NoSuchElementException;
 
 @RestController
 @RequestMapping("/events")
@@ -29,7 +30,7 @@ public class EventController {
     @GetMapping("/{id}")
     public Event getEventById(@PathVariable Long id) {
         return eventRepository.findById(id)
-                              .orElseThrow(() -> new RuntimeException("Event not found: " + id));
+                              .orElseThrow(() -> new NoSuchElementException("Event not found: " + id));
     }
 }
 

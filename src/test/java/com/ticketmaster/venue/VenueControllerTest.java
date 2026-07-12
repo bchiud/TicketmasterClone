@@ -1,6 +1,5 @@
 package com.ticketmaster.venue;
 
-import jakarta.servlet.ServletException;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
@@ -10,7 +9,6 @@ import org.springframework.test.web.servlet.MockMvc;
 import java.util.List;
 import java.util.Optional;
 
-import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
@@ -60,11 +58,10 @@ class VenueControllerTest {
     }
 
     @Test
-    void getVenueByIdThrowsWhenNotFound() {
-        // No @ExceptionHandler exists yet, so the controller's RuntimeException
-        // propagates out of MockMvc instead of becoming a 404/500 response.
+    void getVenueByIdReturns404WhenNotFound() throws Exception {
         when(venueRepository.findById(99L)).thenReturn(Optional.empty());
 
-        assertThrows(ServletException.class, () -> mockMvc.perform(get("/venues/99")));
+        mockMvc.perform(get("/venues/99"))
+                .andExpect(status().isNotFound());
     }
 }

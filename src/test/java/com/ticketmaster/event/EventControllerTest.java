@@ -1,6 +1,5 @@
 package com.ticketmaster.event;
 
-import jakarta.servlet.ServletException;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
@@ -10,7 +9,6 @@ import org.springframework.test.web.servlet.MockMvc;
 import java.util.List;
 import java.util.Optional;
 
-import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
@@ -99,11 +97,10 @@ class EventControllerTest {
     }
 
     @Test
-    void getEventByIdThrowsWhenNotFound() {
-        // No @ExceptionHandler exists yet, so the controller's RuntimeException
-        // propagates out of MockMvc instead of becoming a 404/500 response.
+    void getEventByIdReturns404WhenNotFound() throws Exception {
         when(eventRepository.findById(99L)).thenReturn(Optional.empty());
 
-        assertThrows(ServletException.class, () -> mockMvc.perform(get("/events/99")));
+        mockMvc.perform(get("/events/99"))
+                .andExpect(status().isNotFound());
     }
 }

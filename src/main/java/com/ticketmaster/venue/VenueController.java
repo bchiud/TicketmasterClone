@@ -6,6 +6,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
+import java.util.NoSuchElementException;
 
 @RestController
 @RequestMapping("/venues")
@@ -24,6 +25,6 @@ public class VenueController {
     @GetMapping("/{id}")
     public Venue getVenueById(@PathVariable Long id) {
         return venueRepository.findById(id)
-                              .orElseThrow(() -> new RuntimeException("Venue not found: " + id));
+                              .orElseThrow(() -> new NoSuchElementException("Venue not found: " + id));
     }
 }

@@ -6,6 +6,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
+import java.util.NoSuchElementException;
 
 @RestController
 public class TicketController {
@@ -18,7 +19,7 @@ public class TicketController {
     @GetMapping("/tickets/{id}")
     public Ticket getTicketById(@PathVariable Long id) {
         return ticketRepository.findById(id)
-                               .orElseThrow(() -> new RuntimeException("Ticket not found: " + id));
+                               .orElseThrow(() -> new NoSuchElementException("Ticket not found: " + id));
     }
 
     @GetMapping("/events/{eventId}/tickets")

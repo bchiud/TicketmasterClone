@@ -36,6 +36,14 @@ class TicketControllerTest {
     }
 
     @Test
+    void getTicketReturns404WhenNotFound() throws Exception {
+        when(ticketRepository.findById(99L)).thenReturn(Optional.empty());
+
+        mockMvc.perform(get("/tickets/99"))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
     void getTicketsForEventReturnsAllTicketsWhenNoStatusGiven() throws Exception {
         Ticket ticket = new Ticket();
         ticket.setId(1L);
