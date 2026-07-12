@@ -1,5 +1,6 @@
 package com.ticketmaster.ticket;
 
+import com.ticketmaster.booking.Booking;
 import com.ticketmaster.event.Event;
 import com.ticketmaster.seat.Seat;
 import jakarta.persistence.*;
@@ -34,7 +35,8 @@ public class Ticket {
 
     private ZonedDateTime holdExpiresAt;
 
-    private Long bookingId;
+    @ManyToOne
+    private Booking booking;
 }
 
 
