@@ -76,11 +76,15 @@ That write path is the crux of the language decision. It needs:
 ### Kotlin (JVM)
 - **For**: Runs on the same JVM/Spring ecosystem as Java — same libraries,
   same transactional guarantees — with less boilerplate and null-safety
-  built into the type system.
+  built into the type system. Because it shares the JVM/Spring runtime,
+  switching to it later would be low-risk if the project's goal ever shifted
+  from "learn Spring Boot" to "build this as concisely as possible."
 - **Against**: Smaller community/resource pool than plain Java for a
   learning project; most Spring Boot tutorials, Stack Overflow answers, and
   interview-relevant material default to Java, which matters given the
-  explicit learning goal here.
+  explicit learning goal here. For the *current* goal, Java's larger body of
+  mainstream Spring Boot documentation outweighs Kotlin's conciseness/
+  null-safety advantages.
 
 ## Decision
 Use **Java with Spring Boot** for the application, backed by Postgres (JPA/
@@ -103,3 +107,6 @@ underlies a large share of production booking/e-commerce systems.
 - Locks in the JPA/Hibernate + Spring Data ecosystem for repositories,
   `@Transactional` for the locking transactions in §9.2, and Spring MVC for
   the REST layer — all decisions downstream of this one.
+- Java vs. Kotlin is a low-risk choice to leave open: since both share the
+  JVM/Spring runtime, this decision can be revisited without disturbing the
+  transactional-DB/ORM choices above if the project's priorities shift.
