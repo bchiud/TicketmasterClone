@@ -2,6 +2,7 @@ package com.ticketmaster.booking;
 
 import tools.jackson.databind.ObjectMapper;
 import com.ticketmaster.payment.PaymentService;
+import com.ticketmaster.queue.QueueService;
 import com.ticketmaster.ticket.TicketUnavailableException;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -14,6 +15,7 @@ import java.util.Optional;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -39,6 +41,9 @@ class BookingControllerTest {
 
     @MockitoBean
     private PaymentService paymentService;
+
+    @MockitoBean
+    private QueueService queueService;
 
     @Test
     void getBookingReturnsBookingWhenFound() throws Exception {
@@ -76,6 +81,7 @@ class BookingControllerTest {
         Booking booking = new Booking();
         booking.setId(1L);
         booking.setStatus(BookingStatus.PENDING);
+        when(queueService.hasAccess(anyString())).thenReturn(true);
         when(bookingService.hold(anyLong(), anyLong(), any(), any())).thenReturn(booking);
 
         BookingHoldRequest request = new BookingHoldRequest();
@@ -83,6 +89,7 @@ class BookingControllerTest {
         request.setEventId(2L);
         request.setTicketIds(List.of(3L, 4L));
         request.setIdempotencyKey("idem-1");
+        request.setAccessToken("token-1");
 
         mockMvc.perform(post("/bookings/hold")
                        .contentType("application/json")
@@ -93,6 +100,7 @@ class BookingControllerTest {
 
     @Test
     void holdBookingReturns409WhenTicketUnavailable() throws Exception {
+        when(queueService.hasAccess(anyString())).thenReturn(true);
         when(bookingService.hold(anyLong(), anyLong(), any(), any()))
                 .thenThrow(new TicketUnavailableException("Ticket 3 unavailable"));
 
@@ -101,11 +109,29 @@ class BookingControllerTest {
         request.setEventId(2L);
         request.setTicketIds(List.of(3L));
         request.setIdempotencyKey("idem-2");
+        request.setAccessToken("token-2");
 
         mockMvc.perform(post("/bookings/hold")
                        .contentType("application/json")
                        .content(objectMapper.writeValueAsString(request)))
                .andExpect(status().isConflict());
+    }
+
+    @Test
+    void holdBookingReturns403WhenAccessDenied() throws Exception {
+        when(queueService.hasAccess(anyString())).thenReturn(false);
+
+        BookingHoldRequest request = new BookingHoldRequest();
+        request.setUserId(1L);
+        request.setEventId(2L);
+        request.setTicketIds(List.of(3L));
+        request.setIdempotencyKey("idem-access-denied");
+        request.setAccessToken("bogus-token");
+
+        mockMvc.perform(post("/bookings/hold")
+                       .contentType("application/json")
+                       .content(objectMapper.writeValueAsString(request)))
+               .andExpect(status().isForbidden());
     }
 
     @Test
@@ -117,7 +143,8 @@ class BookingControllerTest {
                .andExpect(content().string(containsString("userId")))
                .andExpect(content().string(containsString("eventId")))
                .andExpect(content().string(containsString("ticketIds")))
-               .andExpect(content().string(containsString("idempotencyKey")));
+               .andExpect(content().string(containsString("idempotencyKey")))
+               .andExpect(content().string(containsString("accessToken")));
     }
 
     @Test
@@ -127,6 +154,7 @@ class BookingControllerTest {
         request.setEventId(2L);
         request.setTicketIds(List.of());
         request.setIdempotencyKey("idem-3");
+        request.setAccessToken("token-3");
 
         mockMvc.perform(post("/bookings/hold")
                        .contentType("application/json")

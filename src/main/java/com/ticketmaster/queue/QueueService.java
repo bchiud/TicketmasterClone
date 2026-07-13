@@ -63,7 +63,7 @@ public class QueueService {
 
     public QueueStatusResponse checkStatus(Long eventId, String token)
     {
-        if (stringRedisTemplate.hasKey("access:" + token))
+        if (hasAccess(token))
             return new QueueStatusResponse(QueueStatus.ADMITTED, null);
 
         Long position = getPosition(eventId, token);
@@ -71,6 +71,10 @@ public class QueueService {
             return new QueueStatusResponse(QueueStatus.WAITING, position);
 
         return new QueueStatusResponse(QueueStatus.INVALID, null);
+    }
+
+    public boolean hasAccess(String token) {
+        return stringRedisTemplate.hasKey("access:" + token);
     }
 
     private String getKey(Long eventId) {

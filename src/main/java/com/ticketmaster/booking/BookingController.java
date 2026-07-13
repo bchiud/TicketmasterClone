@@ -1,6 +1,8 @@
 package com.ticketmaster.booking;
 
 import com.ticketmaster.payment.PaymentService;
+import com.ticketmaster.queue.QueueAccessRequiredException;
+import com.ticketmaster.queue.QueueService;
 import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.*;
 
@@ -12,12 +14,14 @@ public class BookingController {
     private BookingRepository bookingRepository;
     private BookingService bookingService;
     private PaymentService paymentService;
+    private QueueService queueService;
 
     public BookingController(BookingRepository bookingRepository, BookingService bookingService,
-                             PaymentService paymentService) {
+                             PaymentService paymentService, QueueService queueService) {
         this.bookingRepository = bookingRepository;
         this.bookingService = bookingService;
         this.paymentService = paymentService;
+        this.queueService = queueService;
     }
 
     @GetMapping("/bookings/{id}")
@@ -33,6 +37,9 @@ public class BookingController {
 
     @PostMapping("/bookings/hold")
     public Booking holdBooking(@Valid @RequestBody BookingHoldRequest bookingHoldRequest) {
+        if (!queueService.hasAccess(bookingHoldRequest.getAccessToken()))
+            throw new QueueAccessRequiredException("Access Denied");
+
         return bookingService.hold(bookingHoldRequest.getUserId(), bookingHoldRequest.getEventId(),
                                    bookingHoldRequest.getTicketIds(), bookingHoldRequest.getIdempotencyKey());
     }

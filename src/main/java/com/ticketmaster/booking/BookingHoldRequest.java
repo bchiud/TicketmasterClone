@@ -19,4 +19,6 @@ public class BookingHoldRequest {
     private List<Long> ticketIds;
     @NotBlank
     private String idempotencyKey;
+    @NotBlank
+    private String accessToken;
 }

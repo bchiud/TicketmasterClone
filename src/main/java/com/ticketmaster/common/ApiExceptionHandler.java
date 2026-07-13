@@ -1,6 +1,7 @@
 package com.ticketmaster.common;
 
 import com.ticketmaster.booking.InvalidBookingState;
+import com.ticketmaster.queue.QueueAccessRequiredException;
 import com.ticketmaster.ticket.TicketUnavailableException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -41,5 +42,11 @@ public class ApiExceptionHandler {
                            .collect(Collectors.joining(", "));
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                              .body(message);
+    }
+
+    @ExceptionHandler(QueueAccessRequiredException.class)
+    public ResponseEntity<String> handleQueueAccessRequired(QueueAccessRequiredException ex) {
+        return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                             .body(ex.getMessage());
     }
 }
