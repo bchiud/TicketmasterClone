@@ -74,6 +74,8 @@ public class QueueService {
     }
 
     public boolean hasAccess(String token) {
+        if (token == null || token.isBlank())
+            return false;
         return stringRedisTemplate.hasKey("access:" + token);
     }
 

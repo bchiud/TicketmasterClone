@@ -31,4 +31,6 @@ public class Event {
 
     @Enumerated(EnumType.STRING)
     private EventStatus status = EventStatus.SCHEDULED;
+
+    private boolean requiresQueue = false;
 }
