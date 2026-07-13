@@ -7,10 +7,12 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.util.List;
+import java.util.NoSuchElementException;
 import java.util.Optional;
 
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @WebMvcTest(EventController.class)
@@ -21,6 +23,9 @@ class EventControllerTest {
 
     @MockitoBean
     private EventRepository eventRepository;
+
+    @MockitoBean
+    private EventCancellationService eventCancellationService;
 
     @Test
     void getAllEventsReturnsEmptyListWhenNoneExist() throws Exception {
@@ -100,6 +105,36 @@ class EventControllerTest {
         when(eventRepository.findById(99L)).thenReturn(Optional.empty());
 
         mockMvc.perform(get("/events/99"))
+               .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void cancelEventReturnsCancelledEvent() throws Exception {
+        Event event = new Event();
+        event.setId(1L);
+        event.setStatus(EventStatus.CANCELLED);
+        when(eventCancellationService.cancelEvent(1L)).thenReturn(event);
+
+        mockMvc.perform(post("/events/1/cancel"))
+               .andExpect(status().isOk())
+               .andExpect(jsonPath("$.status").value("CANCELLED"));
+    }
+
+    @Test
+    void cancelEventReturns409WhenAlreadyCancelled() throws Exception {
+        when(eventCancellationService.cancelEvent(1L))
+                .thenThrow(new EventAlreadyCancelledException("Event already cancelled"));
+
+        mockMvc.perform(post("/events/1/cancel"))
+               .andExpect(status().isConflict());
+    }
+
+    @Test
+    void cancelEventReturns404WhenNotFound() throws Exception {
+        when(eventCancellationService.cancelEvent(99L))
+                .thenThrow(new NoSuchElementException("Event not found: 99"));
+
+        mockMvc.perform(post("/events/99/cancel"))
                .andExpect(status().isNotFound());
     }
 }

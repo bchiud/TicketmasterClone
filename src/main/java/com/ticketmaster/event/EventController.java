@@ -9,9 +9,11 @@ import java.util.NoSuchElementException;
 @RequestMapping("/events")
 public class EventController {
     private final EventRepository eventRepository;
+    private final EventCancellationService eventCancellationService;
 
-    public EventController(EventRepository eventRepository) {
+    public EventController(EventRepository eventRepository, EventCancellationService eventCancellationService) {
         this.eventRepository = eventRepository;
+        this.eventCancellationService = eventCancellationService;
     }
 
     @GetMapping
@@ -30,7 +32,12 @@ public class EventController {
     @GetMapping("/{id}")
     public Event getEventById(@PathVariable Long id) {
         return eventRepository.findById(id)
-                                  .orElseThrow(() -> new NoSuchElementException("Event not found: " + id));
+                              .orElseThrow(() -> new NoSuchElementException("Event not found: " + id));
+    }
+
+    @PostMapping("/{id}/cancel")
+    public Event cancelEvent(@PathVariable Long id) {
+        return eventCancellationService.cancelEvent(id);
     }
 }
 

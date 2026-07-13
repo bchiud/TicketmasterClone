@@ -9,6 +9,8 @@ import java.util.Optional;
 public interface BookingRepository extends JpaRepository<Booking, Long> {
     Optional<Booking> findByIdempotencyKey(String idempotencyKey);
 
+    List<Booking> findByEventIdAndStatusIn(Long eventId, List<BookingStatus> statuses);
+
     List<Booking> findByUserId(Long userId);
 
     List<Booking> findByStatus(BookingStatus bookingStatus);
