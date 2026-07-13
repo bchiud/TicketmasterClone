@@ -61,6 +61,18 @@ public class QueueService {
         }
     }
 
+    public QueueStatusResponse checkStatus(Long eventId, String token)
+    {
+        if (stringRedisTemplate.hasKey("access:" + token))
+            return new QueueStatusResponse(QueueStatus.ADMITTED, null);
+
+        Long position = getPosition(eventId, token);
+        if (position != null)
+            return new QueueStatusResponse(QueueStatus.WAITING, position);
+
+        return new QueueStatusResponse(QueueStatus.INVALID, null);
+    }
+
     private String getKey(Long eventId) {
         return "queue:" + eventId;
     }
