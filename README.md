@@ -9,6 +9,9 @@ A backend for the classic "design a ticket booking system" problem — see
 - Java 21, Spring Boot 4.1.0 (Spring Framework 7)
 - Spring Data JPA / Hibernate
 - PostgreSQL (see [ADR-0002](docs/adr/0002-database-choice.md))
+- Redis — waiting-room queue and admission tokens (`queue/`), via
+  `StringRedisTemplate` and Lua scripts (`src/main/resources/scripts/`) for
+  the operations that need to be atomic
 - Maven (via `./mvnw`)
 - JaCoCo for test coverage reporting
 
@@ -29,6 +32,9 @@ A backend for the classic "design a ticket booking system" problem — see
   (`spring.datasource.username=${USER}`). Adjust
   `src/main/resources/application.properties` if your local Postgres setup
   differs.
+
+- A local Redis instance reachable at `localhost:6379` (no auth). Used for
+  the queue package's waiting-room state and access tokens.
 
 ## Running
 
@@ -53,31 +59,45 @@ Package-by-feature, one package per domain concept:
 
 ```
 com.ticketmaster/
-├── common/    # cross-cutting infrastructure (e.g. ApiExceptionHandler)
-├── event/
+├── common/    # cross-cutting infrastructure (ApiExceptionHandler, RedisScriptConfig)
+├── event/     # event lifecycle: on-sale/sold-out sweeps, cancellation cascade
 ├── venue/
 ├── seat/
 ├── ticket/
-├── booking/   # in progress
-├── payment/   # not yet started
-└── user/      # not yet started
+├── booking/   # hold/confirm/expire/cancel, queue-gating, per-user ticket cap
+├── payment/   # pay/refund
+├── queue/     # Redis-backed waiting-room queue and admission tokens
+└── user/
 ```
 
-Each feature package follows the same layering: `Entity`, `Repository`
-(Spring Data JPA), `Controller` (Spring MVC).
+Each feature package generally follows the same layering: `Entity`,
+`Repository` (Spring Data JPA), `Service` (business rules), `Controller`
+(Spring MVC). `queue/` has no entity/repository — its state lives entirely
+in Redis.
 
 ## API
 
-| Method | Path                      | Description                                  |
-|--------|---------------------------|-----------------------------------------------|
-| GET    | `/events`                 | List events; optional `name`/`status` filters |
-| GET    | `/events/{id}`            | Get an event by id                            |
-| GET    | `/venues`                 | List venues                                   |
-| GET    | `/venues/{id}`            | Get a venue by id                             |
-| GET    | `/venues/{venueId}/seats` | List seats for a venue                        |
-| GET    | `/seats/{id}`             | Get a seat by id                              |
-| GET    | `/events/{eventId}/tickets` | List tickets for an event; optional `status` filter |
-| GET    | `/tickets/{id}`           | Get a ticket by id                            |
+| Method | Path                          | Description                                          |
+|--------|-------------------------------|-------------------------------------------------------|
+| GET    | `/events`                     | List events; optional `name`/`status` filters          |
+| GET    | `/events/{id}`                | Get an event by id                                     |
+| POST   | `/events/{id}/cancel`         | Cancel an event (cascades to bookings/refunds/tickets) |
+| GET    | `/venues`                     | List venues                                            |
+| GET    | `/venues/{id}`                | Get a venue by id                                      |
+| GET    | `/venues/{venueId}/seats`     | List seats for a venue                                 |
+| GET    | `/seats/{id}`                 | Get a seat by id                                       |
+| GET    | `/events/{eventId}/tickets`   | List tickets for an event; optional `status` filter    |
+| GET    | `/tickets/{id}`               | Get a ticket by id                                     |
+| POST   | `/bookings/hold`               | Hold tickets (idempotent; may require a queue access token) |
+| POST   | `/bookings/{id}/pay`          | Confirm a held booking with payment                    |
+| POST   | `/bookings/{id}/cancel`       | Cancel a booking                                       |
+| GET    | `/bookings/{id}`              | Get a booking by id                                    |
+| GET    | `/users/{userId}/bookings`    | List bookings for a user                               |
+| POST   | `/bookings/{id}/refund`       | Refund a confirmed booking's payment                   |
+| GET    | `/bookings/{id}/payments`     | List payments for a booking                            |
+| GET    | `/payments/{id}`              | Get a payment by id                                    |
+| POST   | `/events/{id}/queue`          | Join the waiting-room queue for an event; returns a token |
+| GET    | `/events/{eventId}/queue/{token}` | Poll queue status/position for a token             |
 
 All not-found lookups return `404` via the centralized
 `ApiExceptionHandler` (`common/`).
