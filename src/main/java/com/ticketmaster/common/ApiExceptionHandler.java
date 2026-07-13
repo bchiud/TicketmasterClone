@@ -1,6 +1,7 @@
 package com.ticketmaster.common;
 
 import com.ticketmaster.booking.InvalidBookingState;
+import com.ticketmaster.event.EventNotOnSaleException;
 import com.ticketmaster.queue.QueueAccessRequiredException;
 import com.ticketmaster.ticket.TicketLimitedExceededException;
 import com.ticketmaster.ticket.TicketUnavailableException;
@@ -15,6 +16,11 @@ import java.util.stream.Collectors;
 
 @RestControllerAdvice
 public class ApiExceptionHandler {
+    @ExceptionHandler(EventNotOnSaleException.class)
+    public ResponseEntity<?> handleEventNotOnSaleException(EventNotOnSaleException ex) {
+        return new ResponseEntity<>(ex.getMessage(), HttpStatus.CONFLICT);
+    }
+
     @ExceptionHandler(InvalidBookingState.class)
     public ResponseEntity<String> handleInvalidBookingState(InvalidBookingState ex) {
         return ResponseEntity.status(HttpStatus.CONFLICT)

@@ -7,6 +7,9 @@ import com.ticketmaster.booking.BookingStatus;
 import com.ticketmaster.booking.InvalidBookingState;
 import com.ticketmaster.event.Event;
 import com.ticketmaster.event.EventRepository;
+import com.ticketmaster.event.EventService;
+import com.ticketmaster.event.EventStatus;
+import com.ticketmaster.queue.QueueService;
 import com.ticketmaster.seat.Seat;
 import com.ticketmaster.seat.SeatRepository;
 import com.ticketmaster.ticket.Ticket;
@@ -21,6 +24,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
 import org.springframework.boot.jdbc.test.autoconfigure.AutoConfigureTestDatabase;
 import org.springframework.context.annotation.Import;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 import java.time.Instant;
 import java.time.ZonedDateTime;
@@ -32,11 +36,16 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 @DataJpaTest
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
-@Import({BookingService.class, PaymentService.class})
+@Import({BookingService.class, PaymentService.class, EventService.class})
 class PaymentServiceTest {
 
     @Autowired
     private PaymentService paymentService;
+
+    // events in these tests default to requiresQueue=false, so this is never actually invoked -
+    // it just needs to exist as a bean for BookingService to wire
+    @MockitoBean
+    private QueueService queueService;
 
     @Autowired
     private BookingService bookingService;
@@ -80,6 +89,7 @@ class PaymentServiceTest {
         event.setVenue(venue);
         event.setStartsAt(ZonedDateTime.now()
                                        .plusDays(30));
+        event.setStatus(EventStatus.ON_SALE);
         return eventRepository.save(event);
     }
 
@@ -103,7 +113,7 @@ class PaymentServiceTest {
         User user = saveUser();
         Event event = saveEvent();
         Ticket ticket = saveTicket(event, "1", 150);
-        Booking booking = bookingService.hold(user.getId(), event.getId(), List.of(ticket.getId()), "pay-idem-1");
+        Booking booking = bookingService.hold(user.getId(), event.getId(), List.of(ticket.getId()), "pay-idem-1", null);
 
         Booking confirmed = paymentService.pay(booking.getId());
 
@@ -135,7 +145,7 @@ class PaymentServiceTest {
         User user = saveUser();
         Event event = saveEvent();
         Ticket ticket = saveTicket(event, "1", 150);
-        Booking booking = bookingService.hold(user.getId(), event.getId(), List.of(ticket.getId()), "pay-idem-2");
+        Booking booking = bookingService.hold(user.getId(), event.getId(), List.of(ticket.getId()), "pay-idem-2", null);
         paymentService.pay(booking.getId());
 
         assertThatThrownBy(() -> paymentService.pay(booking.getId()))
@@ -147,7 +157,7 @@ class PaymentServiceTest {
         User user = saveUser();
         Event event = saveEvent();
         Ticket ticket = saveTicket(event, "1", 150);
-        Booking booking = bookingService.hold(user.getId(), event.getId(), List.of(ticket.getId()), "pay-idem-3");
+        Booking booking = bookingService.hold(user.getId(), event.getId(), List.of(ticket.getId()), "pay-idem-3", null);
         booking.setExpiresAt(Instant.now()
                                      .minusSeconds(60));
         bookingRepository.saveAndFlush(booking);

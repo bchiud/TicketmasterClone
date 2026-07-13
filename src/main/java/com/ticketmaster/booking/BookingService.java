@@ -1,6 +1,9 @@
 package com.ticketmaster.booking;
 
-import com.ticketmaster.event.EventRepository;
+import com.ticketmaster.event.Event;
+import com.ticketmaster.event.EventService;
+import com.ticketmaster.queue.QueueAccessRequiredException;
+import com.ticketmaster.queue.QueueService;
 import com.ticketmaster.ticket.*;
 import com.ticketmaster.user.UserRepository;
 import jakarta.annotation.PostConstruct;
@@ -23,13 +26,15 @@ public class BookingService {
     @Autowired
     private BookingRepository bookingRepository;
     @Autowired
-    private EventRepository eventRepository;
+    private EventService eventService;
+    @Autowired
+    private PlatformTransactionManager transactionManager;
+    @Autowired
+    private QueueService queueService;
     @Autowired
     private TicketRepository ticketRepository;
     @Autowired
     private UserRepository userRepository;
-    @Autowired
-    private PlatformTransactionManager transactionManager;
 
     @Value("${booking.max-tickets-per-user:4}")
     private int maxTicketsPerUser;
@@ -41,8 +46,17 @@ public class BookingService {
     }
 
     @Transactional
-    public Booking hold(Long userId, Long eventId, List<Long> ticketIds, String idempotencyKey) {
-        // 0. check against booking ticket limit
+    public Booking hold(Long userId, Long eventId, List<Long> ticketIds, String idempotencyKey, String accessToken) {
+        // 1. ensure event is onsale
+        Event event = eventService.getEventIfOnSale(eventId);
+
+        // 2. check if event requires queueing
+        if (event.isRequiresQueue()) {
+            if (accessToken == null || accessToken.isBlank() || !queueService.hasAccess(accessToken))
+                throw new QueueAccessRequiredException("Access Denied");
+        }
+
+        // 2. check against booking ticket limit
         List<BookingStatus> openStatuses = new ArrayList<>(List.of(BookingStatus.PENDING, BookingStatus.CONFIRMED));
         int openTickets = bookingRepository.findByUserIdAndEventIdAndStatusIn(userId, eventId, openStatuses)
                                            .stream()
@@ -52,20 +66,20 @@ public class BookingService {
         if ((openTickets + ticketIds.size()) > maxTicketsPerUser)
             throw new TicketLimitedExceededException("Maximum number of tickets per user exceeded");
 
-        // 1. check if booking exists
+        // 3. check if booking exists
         Optional<Booking> existingBooking = bookingRepository.findByIdempotencyKey(idempotencyKey);
         return existingBooking.orElseGet(() -> {
 
-            // 2. lock tickets
+            // 4. lock ticket rows on read
             List<Ticket> tickets = ticketRepository.findByIdIn(ticketIds);
             if (tickets.size() != ticketIds.size()) throw new TicketUnavailableException();
 
-            // 3. validate availability
+            // 5. validate availability
             for (Ticket ticket : tickets)
                 if (ticket.getStatus() != TicketStatus.AVAILABLE) throw new TicketUnavailableException(
                         "Ticket %d unavailable".formatted(ticket.getId()));
 
-            // 4. hold tickets
+            // 6. hold tickets
             ZonedDateTime expiresAt = ZonedDateTime.now()
                                                    .plusMinutes(10);
             int totalCents = 0;
@@ -76,14 +90,12 @@ public class BookingService {
             }
             ticketRepository.saveAll(tickets);
 
-            // 5. book!
+            // 7. book!
             Booking booking = new Booking();
             booking.setUser(userRepository.findById(userId)
                                           .orElseThrow(
                                                   () -> new NoSuchElementException("User not found: " + userId)));
-            booking.setEvent(eventRepository.findById(eventId)
-                                            .orElseThrow(() -> new NoSuchElementException(
-                                                    "Event not found: " + eventId)));
+            booking.setEvent(event);
             booking.setTickets(tickets);
             booking.setStatus(BookingStatus.PENDING);
             booking.setTotalCents(totalCents);
@@ -113,6 +125,8 @@ public class BookingService {
 
         ticketRepository.saveAll(booking.getTickets());
         bookingRepository.save(booking);
+
+        eventService.markSoldOutIfLastTicketBooked(booking.getEvent());
 
         return booking;
     }

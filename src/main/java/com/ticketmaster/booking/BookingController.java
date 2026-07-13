@@ -1,10 +1,6 @@
 package com.ticketmaster.booking;
 
-import com.ticketmaster.event.Event;
-import com.ticketmaster.event.EventRepository;
 import com.ticketmaster.payment.PaymentService;
-import com.ticketmaster.queue.QueueAccessRequiredException;
-import com.ticketmaster.queue.QueueService;
 import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.*;
 
@@ -15,18 +11,13 @@ import java.util.NoSuchElementException;
 public class BookingController {
     private BookingRepository bookingRepository;
     private BookingService bookingService;
-    private EventRepository eventRepository;
     private PaymentService paymentService;
-    private QueueService queueService;
 
     public BookingController(BookingRepository bookingRepository, BookingService bookingService,
-                             EventRepository eventRepository, PaymentService paymentService,
-                             QueueService queueService) {
+                             PaymentService paymentService) {
         this.bookingRepository = bookingRepository;
         this.bookingService = bookingService;
-        this.eventRepository = eventRepository;
         this.paymentService = paymentService;
-        this.queueService = queueService;
     }
 
     @GetMapping("/bookings/{id}")
@@ -42,16 +33,9 @@ public class BookingController {
 
     @PostMapping("/bookings/hold")
     public Booking holdBooking(@Valid @RequestBody BookingHoldRequest bookingHoldRequest) {
-        if (eventRepository.findById(bookingHoldRequest.getEventId())
-                           .map(Event::isRequiresQueue)
-                           .orElse(false)) {
-            String token = bookingHoldRequest.getAccessToken();
-            if (token == null || token.isBlank() || !queueService.hasAccess(token))
-                throw new QueueAccessRequiredException("Access Denied");
-        }
-
         return bookingService.hold(bookingHoldRequest.getUserId(), bookingHoldRequest.getEventId(),
-                                   bookingHoldRequest.getTicketIds(), bookingHoldRequest.getIdempotencyKey());
+                                   bookingHoldRequest.getTicketIds(), bookingHoldRequest.getIdempotencyKey(),
+                                   bookingHoldRequest.getAccessToken());
     }
 
     @PostMapping("/bookings/{id}/pay")

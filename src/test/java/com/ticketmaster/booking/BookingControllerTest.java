@@ -1,10 +1,8 @@
 package com.ticketmaster.booking;
 
 import tools.jackson.databind.ObjectMapper;
-import com.ticketmaster.event.Event;
-import com.ticketmaster.event.EventRepository;
 import com.ticketmaster.payment.PaymentService;
-import com.ticketmaster.queue.QueueService;
+import com.ticketmaster.queue.QueueAccessRequiredException;
 import com.ticketmaster.ticket.TicketUnavailableException;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -17,7 +15,6 @@ import java.util.Optional;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
-import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -42,13 +39,7 @@ class BookingControllerTest {
     private BookingService bookingService;
 
     @MockitoBean
-    private EventRepository eventRepository;
-
-    @MockitoBean
     private PaymentService paymentService;
-
-    @MockitoBean
-    private QueueService queueService;
 
     @Test
     void getBookingReturnsBookingWhenFound() throws Exception {
@@ -82,16 +73,11 @@ class BookingControllerTest {
     }
 
     @Test
-    void holdBookingReturnsCreatedBookingWhenQueueNotRequired() throws Exception {
-        Event event = new Event();
-        event.setId(2L);
-        event.setRequiresQueue(false);
-        when(eventRepository.findById(2L)).thenReturn(Optional.of(event));
-
+    void holdBookingReturnsCreatedBooking() throws Exception {
         Booking booking = new Booking();
         booking.setId(1L);
         booking.setStatus(BookingStatus.PENDING);
-        when(bookingService.hold(anyLong(), anyLong(), any(), any())).thenReturn(booking);
+        when(bookingService.hold(anyLong(), anyLong(), any(), any(), any())).thenReturn(booking);
 
         BookingHoldRequest request = new BookingHoldRequest();
         request.setUserId(1L);
@@ -108,39 +94,8 @@ class BookingControllerTest {
     }
 
     @Test
-    void holdBookingReturnsCreatedBookingWhenQueueRequiredAndAccessGranted() throws Exception {
-        Event event = new Event();
-        event.setId(2L);
-        event.setRequiresQueue(true);
-        when(eventRepository.findById(2L)).thenReturn(Optional.of(event));
-        when(queueService.hasAccess(anyString())).thenReturn(true);
-
-        Booking booking = new Booking();
-        booking.setId(1L);
-        booking.setStatus(BookingStatus.PENDING);
-        when(bookingService.hold(anyLong(), anyLong(), any(), any())).thenReturn(booking);
-
-        BookingHoldRequest request = new BookingHoldRequest();
-        request.setUserId(1L);
-        request.setEventId(2L);
-        request.setTicketIds(List.of(3L, 4L));
-        request.setIdempotencyKey("idem-1b");
-        request.setAccessToken("token-1b");
-
-        mockMvc.perform(post("/bookings/hold")
-                       .contentType("application/json")
-                       .content(objectMapper.writeValueAsString(request)))
-               .andExpect(status().isOk())
-               .andExpect(jsonPath("$.status").value("PENDING"));
-    }
-
-    @Test
     void holdBookingReturns409WhenTicketUnavailable() throws Exception {
-        Event event = new Event();
-        event.setId(2L);
-        event.setRequiresQueue(false);
-        when(eventRepository.findById(2L)).thenReturn(Optional.of(event));
-        when(bookingService.hold(anyLong(), anyLong(), any(), any()))
+        when(bookingService.hold(anyLong(), anyLong(), any(), any(), any()))
                 .thenThrow(new TicketUnavailableException("Ticket 3 unavailable"));
 
         BookingHoldRequest request = new BookingHoldRequest();
@@ -157,12 +112,9 @@ class BookingControllerTest {
     }
 
     @Test
-    void holdBookingReturns403WhenQueueRequiredAndAccessDenied() throws Exception {
-        Event event = new Event();
-        event.setId(2L);
-        event.setRequiresQueue(true);
-        when(eventRepository.findById(2L)).thenReturn(Optional.of(event));
-        when(queueService.hasAccess(anyString())).thenReturn(false);
+    void holdBookingReturns403WhenQueueAccessRequired() throws Exception {
+        when(bookingService.hold(anyLong(), anyLong(), any(), any(), any()))
+                .thenThrow(new QueueAccessRequiredException("Access Denied"));
 
         BookingHoldRequest request = new BookingHoldRequest();
         request.setUserId(1L);
@@ -170,26 +122,6 @@ class BookingControllerTest {
         request.setTicketIds(List.of(3L));
         request.setIdempotencyKey("idem-access-denied");
         request.setAccessToken("bogus-token");
-
-        mockMvc.perform(post("/bookings/hold")
-                       .contentType("application/json")
-                       .content(objectMapper.writeValueAsString(request)))
-               .andExpect(status().isForbidden());
-    }
-
-    @Test
-    void holdBookingReturns403WhenQueueRequiredAndAccessTokenMissing() throws Exception {
-        Event event = new Event();
-        event.setId(2L);
-        event.setRequiresQueue(true);
-        when(eventRepository.findById(2L)).thenReturn(Optional.of(event));
-
-        BookingHoldRequest request = new BookingHoldRequest();
-        request.setUserId(1L);
-        request.setEventId(2L);
-        request.setTicketIds(List.of(3L));
-        request.setIdempotencyKey("idem-access-missing");
-        // accessToken intentionally left null
 
         mockMvc.perform(post("/bookings/hold")
                        .contentType("application/json")
