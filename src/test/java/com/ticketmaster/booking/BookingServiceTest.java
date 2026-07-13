@@ -5,6 +5,7 @@ import com.ticketmaster.event.EventRepository;
 import com.ticketmaster.seat.Seat;
 import com.ticketmaster.seat.SeatRepository;
 import com.ticketmaster.ticket.Ticket;
+import com.ticketmaster.ticket.TicketLimitedExceededException;
 import com.ticketmaster.ticket.TicketRepository;
 import com.ticketmaster.ticket.TicketStatus;
 import com.ticketmaster.ticket.TicketUnavailableException;
@@ -88,6 +89,13 @@ class BookingServiceTest {
         return ticketRepository.save(ticket);
     }
 
+    private List<Long> saveTickets(Event event, int count) {
+        List<Long> ticketIds = new java.util.ArrayList<>();
+        for (int i = 0; i < count; i++)
+            ticketIds.add(saveTicket(event, "seat-" + java.util.UUID.randomUUID(), 100).getId());
+        return ticketIds;
+    }
+
     @Test
     void holdsAvailableTicketsAndCreatesAPendingBooking() {
         User user = saveUser();
@@ -147,6 +155,40 @@ class BookingServiceTest {
         assertThatThrownBy(() ->
                 bookingService.hold(user.getId(), event.getId(), List.of(999L), "idem-5"))
                 .isInstanceOf(TicketUnavailableException.class);
+    }
+
+    @Test
+    void holdsExactlyUpToTheTicketCapInOneHold() {
+        User user = saveUser();
+        Event event = saveEvent();
+        List<Long> ticketIds = saveTickets(event, 8); // configured cap is 8
+
+        Booking booking = bookingService.hold(user.getId(), event.getId(), ticketIds, "idem-cap-1");
+
+        assertThat(booking.getTickets()).hasSize(8);
+    }
+
+    @Test
+    void throwsWhenRequestingMoreTicketsThanTheCapInOneHold() {
+        User user = saveUser();
+        Event event = saveEvent();
+        List<Long> ticketIds = saveTickets(event, 9); // one over the configured cap of 8
+
+        assertThatThrownBy(() -> bookingService.hold(user.getId(), event.getId(), ticketIds, "idem-cap-2"))
+                .isInstanceOf(TicketLimitedExceededException.class);
+    }
+
+    @Test
+    void throwsWhenExistingHoldsPlusNewRequestExceedTheCap() {
+        User user = saveUser();
+        Event event = saveEvent();
+        List<Long> firstEight = saveTickets(event, 8);
+        bookingService.hold(user.getId(), event.getId(), firstEight, "idem-cap-3a");
+
+        List<Long> oneMore = saveTickets(event, 1);
+
+        assertThatThrownBy(() -> bookingService.hold(user.getId(), event.getId(), oneMore, "idem-cap-3b"))
+                .isInstanceOf(TicketLimitedExceededException.class);
     }
 
     @Test

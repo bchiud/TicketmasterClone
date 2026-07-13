@@ -14,4 +14,7 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
     List<Booking> findByStatus(BookingStatus bookingStatus);
 
     List<Booking> findByStatusAndExpiresAtBefore(BookingStatus bookingStatus, Instant cutoff);
+
+    List<Booking> findByUserIdAndEventIdAndStatusIn(Long userId, Long
+            eventId, List<BookingStatus> statuses);
 }

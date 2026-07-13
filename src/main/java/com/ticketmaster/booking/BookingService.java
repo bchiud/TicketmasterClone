@@ -1,15 +1,13 @@
 package com.ticketmaster.booking;
 
 import com.ticketmaster.event.EventRepository;
-import com.ticketmaster.ticket.Ticket;
-import com.ticketmaster.ticket.TicketRepository;
-import com.ticketmaster.ticket.TicketStatus;
-import com.ticketmaster.ticket.TicketUnavailableException;
+import com.ticketmaster.ticket.*;
 import com.ticketmaster.user.UserRepository;
 import jakarta.annotation.PostConstruct;
 import jakarta.transaction.Transactional;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
@@ -17,10 +15,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 
 import java.time.Instant;
 import java.time.ZonedDateTime;
-import java.util.EnumSet;
-import java.util.List;
-import java.util.NoSuchElementException;
-import java.util.Optional;
+import java.util.*;
 
 @Service
 @Slf4j  // lombok generates LoggerFactory.getLogger()
@@ -36,6 +31,8 @@ public class BookingService {
     @Autowired
     private PlatformTransactionManager transactionManager;
 
+    @Value("${booking.max-tickets-per-user:4}")
+    private int maxTicketsPerUser;
     private TransactionTemplate transactionTemplate;
 
     @PostConstruct
@@ -45,9 +42,20 @@ public class BookingService {
 
     @Transactional
     public Booking hold(Long userId, Long eventId, List<Long> ticketIds, String idempotencyKey) {
+        // 0. check against booking ticket limit
+        List<BookingStatus> openStatuses = new ArrayList<>(List.of(BookingStatus.PENDING, BookingStatus.CONFIRMED));
+        List<Booking> openBookings = bookingRepository.findByUserIdAndEventIdAndStatusIn(userId, eventId, openStatuses);
+        int openTickets = openBookings.stream()
+                                      .mapToInt(b -> b.getTickets()
+                                                      .size())
+                                      .sum();
+        if ((openTickets + ticketIds.size()) > maxTicketsPerUser)
+            throw new TicketLimitedExceededException("Maximum number of tickets per user exceeded");
+
         // 1. check if booking exists
         Optional<Booking> optionalBooking = bookingRepository.findByIdempotencyKey(idempotencyKey);
         return optionalBooking.orElseGet(() -> {
+
             // 2. lock tickets
             List<Ticket> tickets = ticketRepository.findByIdIn(ticketIds);
             if (tickets.size() != ticketIds.size()) throw new TicketUnavailableException();
@@ -137,10 +145,12 @@ public class BookingService {
     @Transactional
     public Booking cancel(long bookingId) {
         Booking booking = bookingRepository.findById(bookingId)
-                         .orElseThrow(() -> new NoSuchElementException("Booking not found: " + bookingId));
+                                           .orElseThrow(
+                                                   () -> new NoSuchElementException("Booking not found: " + bookingId));
 
         // BookingStatus.CONFIRMED for refund flow
-        if (!EnumSet.of(BookingStatus.PENDING, BookingStatus.CONFIRMED).contains(booking.getStatus()))
+        if (!EnumSet.of(BookingStatus.PENDING, BookingStatus.CONFIRMED)
+                    .contains(booking.getStatus()))
             throw new InvalidBookingState("Booking not pending or confirmed");
 
         booking.setStatus(BookingStatus.CANCELLED);

@@ -2,6 +2,7 @@ package com.ticketmaster.common;
 
 import com.ticketmaster.booking.InvalidBookingState;
 import com.ticketmaster.queue.QueueAccessRequiredException;
+import com.ticketmaster.ticket.TicketLimitedExceededException;
 import com.ticketmaster.ticket.TicketUnavailableException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -14,18 +15,6 @@ import java.util.stream.Collectors;
 
 @RestControllerAdvice
 public class ApiExceptionHandler {
-    @ExceptionHandler(NoSuchElementException.class)
-    public ResponseEntity<String> handleNotFound(NoSuchElementException ex) {
-        return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                             .body(ex.getMessage());
-    }
-
-    @ExceptionHandler(TicketUnavailableException.class)
-    public ResponseEntity<String> handleTicketUnavailable(TicketUnavailableException ex) {
-        return ResponseEntity.status(HttpStatus.CONFLICT)
-                             .body(ex.getMessage());
-    }
-
     @ExceptionHandler(InvalidBookingState.class)
     public ResponseEntity<String> handleInvalidBookingState(InvalidBookingState ex) {
         return ResponseEntity.status(HttpStatus.CONFLICT)
@@ -44,9 +33,27 @@ public class ApiExceptionHandler {
                              .body(message);
     }
 
+    @ExceptionHandler(NoSuchElementException.class)
+    public ResponseEntity<String> handleNotFound(NoSuchElementException ex) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                             .body(ex.getMessage());
+    }
+
     @ExceptionHandler(QueueAccessRequiredException.class)
     public ResponseEntity<String> handleQueueAccessRequired(QueueAccessRequiredException ex) {
         return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                             .body(ex.getMessage());
+    }
+
+    @ExceptionHandler(TicketLimitedExceededException.class)
+    public ResponseEntity<String> handleTicketLimitedExceeded(TicketLimitedExceededException ex) {
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                             .body(ex.getMessage());
+    }
+
+    @ExceptionHandler(TicketUnavailableException.class)
+    public ResponseEntity<String> handleTicketUnavailable(TicketUnavailableException ex) {
+        return ResponseEntity.status(HttpStatus.CONFLICT)
                              .body(ex.getMessage());
     }
 }
