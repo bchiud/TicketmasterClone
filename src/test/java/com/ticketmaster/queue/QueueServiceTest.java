@@ -27,8 +27,35 @@ class QueueServiceTest {
     }
 
     @Test
-    void enqueueAssignsFifoPositionsInOrder() {
+    void enqueueGrantsImmediateAccessUpToAdmitRateWhenBacklogEmpty() {
         Long eventId = uniqueEventId();
+
+        String first = queueService.enqueue(eventId);
+        String second = queueService.enqueue(eventId);
+
+        assertThat(queueService.hasAccess(eventId, first)).isTrue();
+        assertThat(queueService.hasAccess(eventId, second)).isTrue();
+        assertThat(queueService.getPosition(eventId, first)).isNull();
+        assertThat(queueService.getPosition(eventId, second)).isNull();
+    }
+
+    @Test
+    void enqueueQueuesArrivalsBeyondAdmitRateWhenBacklogEmpty() {
+        Long eventId = uniqueEventId();
+        queueService.enqueue(eventId); // consumes escape-hatch slot 1
+        queueService.enqueue(eventId); // consumes escape-hatch slot 2 (admit-rate=2)
+
+        String overflow = queueService.enqueue(eventId);
+
+        assertThat(queueService.hasAccess(eventId, overflow)).isFalse();
+        assertThat(queueService.getPosition(eventId, overflow)).isEqualTo(0);
+    }
+
+    @Test
+    void enqueueAssignsFifoPositionsInOrderAmongQueuedArrivals() {
+        Long eventId = uniqueEventId();
+        queueService.enqueue(eventId);
+        queueService.enqueue(eventId); // both consume the admit-rate=2 escape hatch
 
         String first = queueService.enqueue(eventId);
         String second = queueService.enqueue(eventId);
@@ -48,28 +75,44 @@ class QueueServiceTest {
 
     @Test
     void hasAccessReturnsFalseForNullOrBlankToken() {
-        assertThat(queueService.hasAccess(null)).isFalse();
-        assertThat(queueService.hasAccess("")).isFalse();
-        assertThat(queueService.hasAccess("   ")).isFalse();
+        Long eventId = uniqueEventId();
+        assertThat(queueService.hasAccess(eventId, null)).isFalse();
+        assertThat(queueService.hasAccess(eventId, "")).isFalse();
+        assertThat(queueService.hasAccess(eventId, "   ")).isFalse();
     }
 
     @Test
     void hasAccessReturnsFalseWhenNeverAdmitted() {
-        assertThat(queueService.hasAccess("never-admitted-token")).isFalse();
+        Long eventId = uniqueEventId();
+        assertThat(queueService.hasAccess(eventId, "never-admitted-token")).isFalse();
     }
 
     @Test
-    void admitGrantsAccessUpToConfiguredRateInFifoOrder() {
+    void hasAccessIsScopedPerEvent() {
+        Long eventA = uniqueEventId();
+        Long eventB = uniqueEventId();
+
+        String token = queueService.enqueue(eventA); // backlog empty, under admit-rate -> fast-tracked
+
+        assertThat(queueService.hasAccess(eventA, token)).isTrue();
+        assertThat(queueService.hasAccess(eventB, token)).isFalse();
+    }
+
+    @Test
+    void admitGrantsAccessUpToConfiguredRateFromBacklogInFifoOrder() {
         Long eventId = uniqueEventId();
+        queueService.enqueue(eventId);
+        queueService.enqueue(eventId); // consume the admit-rate=2 escape hatch
+
         String first = queueService.enqueue(eventId);
         String second = queueService.enqueue(eventId);
         String third = queueService.enqueue(eventId);
 
-        queueService.admit(); // queue.admit-rate=2 for this test class
+        queueService.admit(); // pops 2 of the 3 queued (admit-rate=2)
 
-        assertThat(queueService.hasAccess(first)).isTrue();
-        assertThat(queueService.hasAccess(second)).isTrue();
-        assertThat(queueService.hasAccess(third)).isFalse();
+        assertThat(queueService.hasAccess(eventId, first)).isTrue();
+        assertThat(queueService.hasAccess(eventId, second)).isTrue();
+        assertThat(queueService.hasAccess(eventId, third)).isFalse();
         assertThat(queueService.getPosition(eventId, third)).isEqualTo(0);
     }
 
@@ -77,25 +120,33 @@ class QueueServiceTest {
     void admitAdmitsIndependentlyAcrossMultipleActiveEvents() {
         Long eventA = uniqueEventId();
         Long eventB = uniqueEventId();
-        String tokenA = queueService.enqueue(eventA);
-        String tokenB = queueService.enqueue(eventB);
+        queueService.enqueue(eventA);
+        queueService.enqueue(eventA); // consume eventA's escape hatch
+        queueService.enqueue(eventB);
+        queueService.enqueue(eventB); // consume eventB's escape hatch
+
+        String queuedA = queueService.enqueue(eventA);
+        String queuedB = queueService.enqueue(eventB);
 
         queueService.admit();
 
-        assertThat(queueService.hasAccess(tokenA)).isTrue();
-        assertThat(queueService.hasAccess(tokenB)).isTrue();
+        assertThat(queueService.hasAccess(eventA, queuedA)).isTrue();
+        assertThat(queueService.hasAccess(eventB, queuedB)).isTrue();
     }
 
     @Test
     void checkStatusReflectsWaitingAdmittedAndInvalid() {
         Long eventId = uniqueEventId();
-        String admittedToken = queueService.enqueue(eventId);
-        queueService.enqueue(eventId); // second slot, also consumes the rate=2 budget
-        String waitingToken = queueService.enqueue(eventId);
+        String escapeHatchToken = queueService.enqueue(eventId);
+        queueService.enqueue(eventId); // consume the admit-rate=2 escape hatch
 
-        queueService.admit();
+        queueService.enqueue(eventId); // queued, will be popped by admit()
+        queueService.enqueue(eventId); // queued, will be popped by admit()
+        String waitingToken = queueService.enqueue(eventId); // queued, remains waiting
 
-        assertThat(queueService.checkStatus(eventId, admittedToken).getQueueStatus())
+        queueService.admit(); // pops 2 of the 3 queued
+
+        assertThat(queueService.checkStatus(eventId, escapeHatchToken).getQueueStatus())
                 .isEqualTo(QueueStatus.ADMITTED);
         assertThat(queueService.checkStatus(eventId, waitingToken).getQueueStatus())
                 .isEqualTo(QueueStatus.WAITING);

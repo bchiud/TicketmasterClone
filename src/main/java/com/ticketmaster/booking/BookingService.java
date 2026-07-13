@@ -52,7 +52,7 @@ public class BookingService {
 
         // 2. check if event requires queueing
         if (event.isRequiresQueue()) {
-            if (accessToken == null || accessToken.isBlank() || !queueService.hasAccess(accessToken))
+            if (accessToken == null || accessToken.isBlank() || !queueService.hasAccess(eventId, accessToken))
                 throw new QueueAccessRequiredException("Access Denied");
         }
 

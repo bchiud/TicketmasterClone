@@ -13,6 +13,9 @@ import org.springframework.stereotype.Service;
 import java.util.List;
 import java.util.NoSuchElementException;
 
+// this is pulled out of EventService to prevent circular dependencies
+// most Services depend on EventService
+// but Event(CancellationService).cancel(Event) depends on most Services
 @Service
 public class EventCancellationService {
     @Autowired

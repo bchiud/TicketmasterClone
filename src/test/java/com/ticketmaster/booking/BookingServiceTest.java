@@ -224,7 +224,7 @@ class BookingServiceTest {
         event.setRequiresQueue(true);
         eventRepository.save(event);
         Ticket ticket = saveTicket(event, "1", 100);
-        when(queueService.hasAccess("valid-token")).thenReturn(true);
+        when(queueService.hasAccess(event.getId(), "valid-token")).thenReturn(true);
 
         Booking booking = bookingService.hold(
                 user.getId(), event.getId(), List.of(ticket.getId()), "idem-queue-1", "valid-token");
@@ -239,7 +239,7 @@ class BookingServiceTest {
         event.setRequiresQueue(true);
         eventRepository.save(event);
         Ticket ticket = saveTicket(event, "1", 100);
-        when(queueService.hasAccess("bad-token")).thenReturn(false);
+        when(queueService.hasAccess(event.getId(), "bad-token")).thenReturn(false);
 
         assertThatThrownBy(() -> bookingService.hold(
                 user.getId(), event.getId(), List.of(ticket.getId()), "idem-queue-2", "bad-token"))
