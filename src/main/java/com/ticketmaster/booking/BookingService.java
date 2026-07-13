@@ -44,17 +44,17 @@ public class BookingService {
     public Booking hold(Long userId, Long eventId, List<Long> ticketIds, String idempotencyKey) {
         // 0. check against booking ticket limit
         List<BookingStatus> openStatuses = new ArrayList<>(List.of(BookingStatus.PENDING, BookingStatus.CONFIRMED));
-        List<Booking> openBookings = bookingRepository.findByUserIdAndEventIdAndStatusIn(userId, eventId, openStatuses);
-        int openTickets = openBookings.stream()
-                                      .mapToInt(b -> b.getTickets()
-                                                      .size())
-                                      .sum();
+        int openTickets = bookingRepository.findByUserIdAndEventIdAndStatusIn(userId, eventId, openStatuses)
+                                           .stream()
+                                           .mapToInt(b -> b.getTickets()
+                                                           .size())
+                                           .sum();
         if ((openTickets + ticketIds.size()) > maxTicketsPerUser)
             throw new TicketLimitedExceededException("Maximum number of tickets per user exceeded");
 
         // 1. check if booking exists
-        Optional<Booking> optionalBooking = bookingRepository.findByIdempotencyKey(idempotencyKey);
-        return optionalBooking.orElseGet(() -> {
+        Optional<Booking> existingBooking = bookingRepository.findByIdempotencyKey(idempotencyKey);
+        return existingBooking.orElseGet(() -> {
 
             // 2. lock tickets
             List<Ticket> tickets = ticketRepository.findByIdIn(ticketIds);
