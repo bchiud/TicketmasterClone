@@ -3,6 +3,7 @@ package com.ticketmaster.queue;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.test.context.TestPropertySource;
 
 import java.util.concurrent.ThreadLocalRandom;
@@ -19,6 +20,9 @@ class QueueServiceTest {
 
     @Autowired
     private QueueService queueService;
+
+    @Autowired
+    private StringRedisTemplate stringRedisTemplate;
 
     // unique per test so tests don't collide on shared Redis state
     private Long uniqueEventId() {
@@ -64,6 +68,39 @@ class QueueServiceTest {
         assertThat(queueService.getPosition(eventId, first)).isEqualTo(0);
         assertThat(queueService.getPosition(eventId, second)).isEqualTo(1);
         assertThat(queueService.getPosition(eventId, third)).isEqualTo(2);
+    }
+
+    // arrivals that land on a non-empty backlog must not touch the admitted-count window: they
+    // can't be fast-tracked, so a slot they burn (or a window they open) is a slot denied to
+    // whoever arrives after the backlog drains. reaching into Redis directly is the only way to
+    // pin this - the window's lapse is otherwise only observable via a real admit-interval-ms wait.
+    @Test
+    void queuedArrivalsDoNotConsumeTheFastTrackWindow() {
+        Long eventId = uniqueEventId();
+        String admittedCountKey = "queue:" + eventId + ":admitted-count";
+
+        queueService.enqueue(eventId);
+        queueService.enqueue(eventId); // consume the admit-rate=2 escape hatch
+        queueService.enqueue(eventId); // still finds an empty backlog, but is over rate -> queued
+
+        // simulate the counter's TTL window lapsing while a backlog is still draining
+        stringRedisTemplate.delete(admittedCountKey);
+
+        queueService.enqueue(eventId);
+        queueService.enqueue(eventId);
+        queueService.enqueue(eventId); // all three land on a backlog, so none should re-open the window
+
+        assertThat(stringRedisTemplate.opsForValue().get(admittedCountKey)).isNull();
+
+        queueService.admit();
+        queueService.admit(); // drain the 4-deep backlog at admit-rate=2
+        assertThat(queueService.getPosition(eventId, "any")).isNull();
+
+        // with the window untouched, the next arrival to find an empty queue gets the escape hatch
+        String afterDrain = queueService.enqueue(eventId);
+
+        assertThat(queueService.hasAccess(eventId, afterDrain)).isTrue();
+        assertThat(queueService.getPosition(eventId, afterDrain)).isNull();
     }
 
     @Test

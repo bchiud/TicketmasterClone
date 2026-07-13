@@ -33,21 +33,24 @@ public class QueueService {
 
     public String enqueue(Long eventId) {
         String eventKey = getEventKey(eventId);
-        String eventAdmittedCountKey = getEventAdmittedCountKey(eventKey);
         String token = UUID.randomUUID()
                            .toString();
 
-        Long admittedCount = stringRedisTemplate.opsForValue()
-                                                .increment(eventAdmittedCountKey);
-        // window self-clears every admitIntervalMs so the escape hatch reopens once traffic calms down
-        if (admittedCount == 1) stringRedisTemplate.expire(eventAdmittedCountKey, Duration.ofMillis(admitIntervalMs));
-
         Long queueSize = stringRedisTemplate.opsForZSet()
                                             .zCard(eventKey);
-        // escape hatch: only bypass the real queue if nobody's already waiting AND we're still under the rate this window
-        if ((queueSize == null || queueSize == 0) && admittedCount <= admitRate) {
-            grantAccess(eventId, token);
-            return token;
+        // escape hatch for empty queue
+        if (queueSize == null || queueSize == 0) {
+            String eventAdmittedCountKey = getEventAdmittedCountKey(eventKey);
+            Long admittedCount = stringRedisTemplate.opsForValue()
+                                                    .increment(eventAdmittedCountKey);
+            // window self-clears every admitIntervalMs so the escape hatch reopens once traffic calms down
+            if (admittedCount == 1)
+                stringRedisTemplate.expire(eventAdmittedCountKey, Duration.ofMillis(admitIntervalMs));
+
+            if (admittedCount <= admitRate) {
+                grantAccess(eventId, token);
+                return token;
+            }
         }
 
         // atomic so admit()'s cleanup can never observe this event registered but not yet queued (or vice versa)
