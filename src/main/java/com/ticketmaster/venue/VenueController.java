@@ -1,9 +1,8 @@
 package com.ticketmaster.venue;
 
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import jakarta.validation.Valid;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 import java.util.NoSuchElementException;
@@ -17,6 +16,16 @@ public class VenueController {
         this.venueRepository = venueRepository;
     }
 
+    @PostMapping("")
+    @ResponseStatus(HttpStatus.CREATED)
+    public Venue createVenue(@Valid @RequestBody CreateVenueRequest createVenueRequest) {
+        Venue venue = new Venue();
+        venue.setName(createVenueRequest.getName());
+        venue.setAddress(createVenueRequest.getAddress());
+        venue.setCity(createVenueRequest.getCity());
+        return venueRepository.save(venue);
+    }
+
     @GetMapping("")
     public List<Venue> getAllVenues() {
         return venueRepository.findAll();
@@ -27,4 +36,6 @@ public class VenueController {
         return venueRepository.findById(id)
                               .orElseThrow(() -> new NoSuchElementException("Venue not found: " + id));
     }
+
+
 }
