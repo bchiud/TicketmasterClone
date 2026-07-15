@@ -1,5 +1,6 @@
 package com.ticketmaster.queue;
 
+import com.ticketmaster.event.EventService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.core.Cursor;
@@ -17,24 +18,26 @@ import java.util.UUID;
 
 @Service
 public class QueueService {
-    @Value("${queue.admit-rate:500}")
-    private long admitRate;
-
-    @Value("${queue.admit-interval-ms:1000}")
-    private long admitIntervalMs;
-
-    @Autowired
-    private RedisScript<Long> enqueueScript;
+    private static final String ACTIVE_EVENTS_KEY = "queue:active-events";
 
     @Autowired
     private RedisScript<List> admitCleanupScript;
-
+    @Autowired
+    private RedisScript<Long> enqueueScript;
+    @Autowired
+    private EventService eventService;
     @Autowired
     private StringRedisTemplate stringRedisTemplate;
 
-    private final String ACTIVE_EVENTS_KEY = "queue:active-events";
+    @Value("${queue.admit-rate:500}")
+    private long admitRate;
+    @Value("${queue.admit-interval-ms:1000}")
+    private long admitIntervalMs;
 
     public String enqueue(Long eventId) {
+        // chk if event exists AND is on sale
+        eventService.getEventIfOnSale(eventId);
+
         String eventKey = getEventKey(eventId);
         String token = UUID.randomUUID()
                            .toString();

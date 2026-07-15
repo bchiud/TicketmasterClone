@@ -1,14 +1,19 @@
 package com.ticketmaster.queue;
 
+import com.ticketmaster.event.Event;
+import com.ticketmaster.event.EventNotOnSaleException;
+import com.ticketmaster.event.EventRepository;
+import com.ticketmaster.event.EventStatus;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.test.context.TestPropertySource;
 
-import java.util.concurrent.ThreadLocalRandom;
+import java.util.NoSuchElementException;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 @SpringBootTest
 @TestPropertySource(properties = {
@@ -24,10 +29,16 @@ class QueueServiceTest {
     @Autowired
     private StringRedisTemplate stringRedisTemplate;
 
-    // unique per test so tests don't collide on shared Redis state
+    @Autowired
+    private EventRepository eventRepository;
+
+    // enqueue() now gates on event status, so tests need a real ON_SALE event. The DB-assigned
+    // id is inherently unique, which also keeps each test's Redis keys from colliding.
     private Long uniqueEventId() {
-        return ThreadLocalRandom.current()
-                                .nextLong(1_000_000_000L, 2_000_000_000L);
+        Event event = new Event();
+        event.setStatus(EventStatus.ON_SALE);
+        return eventRepository.save(event)
+                              .getId();
     }
 
     @Test
@@ -101,6 +112,26 @@ class QueueServiceTest {
 
         assertThat(queueService.hasAccess(eventId, afterDrain)).isTrue();
         assertThat(queueService.getPosition(eventId, afterDrain)).isNull();
+    }
+
+    @Test
+    void enqueueRejectsAnEventThatIsNotOnSale() {
+        Event event = new Event();
+        event.setStatus(EventStatus.CANCELLED);
+        Long cancelledEventId = eventRepository.save(event)
+                                               .getId();
+
+        assertThatThrownBy(() -> queueService.enqueue(cancelledEventId))
+                .isInstanceOf(EventNotOnSaleException.class);
+        // and no queue state was created for it
+        assertThat(stringRedisTemplate.opsForSet()
+                                      .isMember("queue:active-events", cancelledEventId.toString())).isFalse();
+    }
+
+    @Test
+    void enqueueRejectsAnUnknownEvent() {
+        assertThatThrownBy(() -> queueService.enqueue(999_999_999L))
+                .isInstanceOf(NoSuchElementException.class);
     }
 
     @Test

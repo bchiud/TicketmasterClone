@@ -1,12 +1,13 @@
 package com.ticketmaster.queue;
 
+import com.ticketmaster.event.Event;
+import com.ticketmaster.event.EventRepository;
+import com.ticketmaster.event.EventStatus;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.test.context.TestPropertySource;
-
-import java.util.concurrent.ThreadLocalRandom;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -27,9 +28,15 @@ class QueueServiceEscapeHatchTest {
     @Autowired
     private StringRedisTemplate stringRedisTemplate;
 
+    @Autowired
+    private EventRepository eventRepository;
+
+    // enqueue() gates on event status, so we need a real ON_SALE event to queue against
     private Long uniqueEventId() {
-        return ThreadLocalRandom.current()
-                                .nextLong(7_000_000_000L, 8_000_000_000L);
+        Event event = new Event();
+        event.setStatus(EventStatus.ON_SALE);
+        return eventRepository.save(event)
+                              .getId();
     }
 
     @Test
