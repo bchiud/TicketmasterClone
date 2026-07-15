@@ -24,8 +24,8 @@ The core tension: **reads want to be cached and eventually-consistent; bookings 
 Event      → (name, date, venue_id, performer)
 Venue      → (name, address, seat_map)
 Seat       → (venue_id, section, row, number)
-Ticket     → (event_id, seat_id, price, status)   ← status: AVAILABLE / HELD / BOOKED
-Booking    → (user_id, ticket_ids, status, total)
+Ticket     → (event_id, seat_id, price, status, booking_id)   ← status: AVAILABLE / HELD / BOOKED
+Booking    → (user_id, event_id, status, total)   ← its tickets link back via Ticket.booking_id
 User, Payment
 ```
 
@@ -126,17 +126,19 @@ FOR UPDATE NOWAIT;
 
 -- Application checks every returned row is AVAILABLE; if not, ROLLBACK.
 
+-- Insert the booking first so the held tickets can point at it (tickets.booking_id FK).
+INSERT INTO bookings (id, user_id, event_id, status, expires_at)
+VALUES (:booking_id, :user_id, :event_id, 'PENDING', now() + interval '8 minutes');
+
 UPDATE tickets
 SET status = 'HELD',
     held_by = :user_id,
+    booking_id = :booking_id,
     hold_expires_at = now() + interval '8 minutes'
 WHERE id = ANY(:seat_ids)
   AND status = 'AVAILABLE';   -- guard: only flips rows still free
 
 -- Row count must equal len(seat_ids). If fewer, someone raced us → ROLLBACK.
-
-INSERT INTO bookings (id, user_id, event_id, ticket_ids, status, expires_at)
-VALUES (:booking_id, :user_id, :event_id, :seat_ids, 'PENDING', now() + interval '8 minutes');
 
 COMMIT;
 ```
@@ -214,7 +216,7 @@ CREATE TABLE tickets (               -- the sellable unit: seat × event
     status          TEXT DEFAULT 'AVAILABLE',  -- AVAILABLE / HELD / BOOKED
     held_by         BIGINT,                    -- user holding it, if any
     hold_expires_at TIMESTAMPTZ,
-    booking_id      BIGINT,
+    booking_id      BIGINT REFERENCES bookings(id),  -- the booking holding it; owns the link (see ADR-0003)
     UNIQUE (event_id, seat_id)                 -- a seat exists once per event
 );
 -- Hot path indexes:
@@ -232,7 +234,8 @@ CREATE TABLE bookings (
     id              BIGINT PRIMARY KEY,
     user_id         BIGINT REFERENCES users(id),
     event_id        BIGINT REFERENCES events(id),
-    ticket_ids      BIGINT[],
+    -- a booking's tickets are found via tickets.booking_id (the FK is on the many side), not an
+    -- array column here — see ADR-0003.
     status          TEXT DEFAULT 'PENDING',    -- PENDING / CONFIRMED / EXPIRED / CANCELLED
     total_cents     INT,
     idempotency_key TEXT UNIQUE,
@@ -254,6 +257,7 @@ CREATE TABLE payments (
 - Pre-generating one `tickets` row per (seat, event) when an event goes on sale makes the seat map a simple query and gives you a concrete row to lock. For general-admission (no assigned seats), replace individual rows with an atomic **counter** (`available_count`) decremented under a lock or via Redis.
 - **Shard by `event_id`.** Contention is per-event, so events scale independently and a hot event's load stays isolated.
 - The partial index on `hold_expires_at` keeps the expiry sweeper cheap even with millions of tickets.
+- A booking's tickets are linked by the **`tickets.booking_id`** foreign key (on the many side), not an array column on `bookings`. This makes the FK the single source of truth and enforces "a ticket belongs to at most one booking" at the DB layer — see [ADR-0003](adr/0003-booking-ticket-association.md). (In the DDL above, `tickets.booking_id REFERENCES bookings(id)` is a forward reference; in practice the constraint is added once both tables exist.)
 
 ## 11. Waiting-Queue Design (the on-sale spike)
 
