@@ -59,8 +59,16 @@ against the isolated `ticketmaster_dev` database:
 
 ```bash
 ./mvnw spring-boot:run -Dspring-boot.run.profiles=dev
-psql -d ticketmaster_dev -f scripts/seed-dev.sql   # optional demo data
+psql -d ticketmaster_dev -f scripts/seed-dev.sql   # optional demo data (idempotent; re-runnable)
 ```
+
+[`docs/demo-runbook.md`](docs/demo-runbook.md) is a full copy-paste walkthrough over `curl`:
+browse/search, booking an open event, the waiting room (escape hatch, backlog drain, rate
+limiting), and admin teardown.
+
+A `prod` profile (`src/main/resources/application-prod.properties`) is also available for
+deployment behind a trusted reverse proxy — it enables `X-Forwarded-For` handling so the per-IP
+enqueue rate limiter sees real client IPs rather than the proxy's.
 
 ## Testing
 
@@ -97,11 +105,13 @@ in Redis.
 
 | Method | Path                          | Description                                          |
 |--------|-------------------------------|-------------------------------------------------------|
-| GET    | `/events`                     | List events; optional `name`/`status` filters          |
+| GET    | `/events`                     | List/search events; optional `name`, `status`, `city`, `performer`, `from`, `to` filters (all optional, ANDed) |
 | GET    | `/events/{id}`                | Get an event by id                                     |
-| POST   | `/events/{id}/cancel`         | Cancel an event (cascades to bookings/refunds/tickets) |
+| POST   | `/events`                     | Create an event; fans out one ticket per venue seat (`201`) |
+| POST   | `/events/{id}/cancel`         | Cancel an event (cascades to bookings/refunds/tickets, purges queue state) |
 | GET    | `/venues`                     | List venues                                            |
 | GET    | `/venues/{id}`                | Get a venue by id                                      |
+| POST   | `/venues`                     | Create a venue (`201`)                                 |
 | GET    | `/venues/{venueId}/seats`     | List seats for a venue                                 |
 | GET    | `/seats/{id}`                 | Get a seat by id                                       |
 | GET    | `/events/{eventId}/tickets`   | List tickets for an event; optional `status` filter    |
@@ -114,8 +124,11 @@ in Redis.
 | POST   | `/bookings/{id}/refund`       | Refund a confirmed booking's payment                   |
 | GET    | `/bookings/{id}/payments`     | List payments for a booking                            |
 | GET    | `/payments/{id}`              | Get a payment by id                                    |
-| POST   | `/events/{id}/queue`          | Join the waiting-room queue for an event; returns a token |
+| POST   | `/events/{id}/queue`          | Join the waiting-room queue; returns a token (per-IP rate limited → `429`) |
 | GET    | `/events/{eventId}/queue/{token}` | Poll queue status/position for a token             |
 
-All not-found lookups return `404` via the centralized
-`ApiExceptionHandler` (`common/`).
+Errors are mapped centrally by `ApiExceptionHandler` (`common/`):
+`400` (invalid request body, or creating an event against a seatless venue),
+`403` (booking a queue-gated event without a valid access token),
+`404` (unknown id), `409` (state-machine conflicts, e.g. paying a cancelled booking),
+`429` (queue join over the per-IP rate limit).
