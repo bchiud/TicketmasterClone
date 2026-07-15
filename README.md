@@ -18,15 +18,25 @@ A backend for the classic "design a ticket booking system" problem — see
 ## Prerequisites
 
 - Java 21+
-- A local PostgreSQL instance with a `ticketmaster` database, reachable at
-  `localhost:5432`. Tests and the app both connect to this real database
-  (see `src/main/resources/application.properties` and `@DataJpaTest` +
-  `@AutoConfigureTestDatabase(replace = Replace.NONE)` in the test suite) —
-  there's no in-memory/H2 fallback.
+- A local PostgreSQL instance reachable at `localhost:5432`. There's no
+  in-memory/H2 fallback — tests run against a real database
+  (`@DataJpaTest` + `@AutoConfigureTestDatabase(replace = Replace.NONE)`).
+
+  The project uses three databases so that running the app, running the tests,
+  and demoing never interfere with one another:
 
   ```bash
-  createdb ticketmaster
+  createdb ticketmaster        # default profile: `./mvnw spring-boot:run`
+  createdb ticketmaster_test   # test suite (activated via the `test` profile in pom.xml)
+  createdb ticketmaster_dev    # demo (`dev` profile)
   ```
+
+  Only `ticketmaster` is strictly required to run the app. `ticketmaster_test`
+  is required to run the test suite; `ticketmaster_dev` only for the demo
+  profile. Each is selected by a Spring profile:
+  `src/main/resources/application.properties` (default),
+  `src/test/resources/application-test.properties`,
+  `src/main/resources/application-dev.properties`.
 
   By default the app connects as `$USER` with no password
   (`spring.datasource.username=${USER}`). Adjust
@@ -35,15 +45,6 @@ A backend for the classic "design a ticket booking system" problem — see
 
 - A local Redis instance reachable at `localhost:6379` (no auth). Used for
   the queue package's waiting-room state and access tokens.
-
-- Optional, only for the `dev` demo profile: a separate `ticketmaster_dev`
-  database. The dev profile points there so hand-driven curl walks (which
-  commit real rows that don't roll back) can't pollute the `ticketmaster`
-  database the test suite runs against.
-
-  ```bash
-  createdb ticketmaster_dev
-  ```
 
 ## Running
 

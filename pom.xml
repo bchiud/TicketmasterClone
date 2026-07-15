@@ -89,6 +89,18 @@
 				</configuration>
 			</plugin>
 			<plugin>
+				<!-- Run the whole test suite under the `test` profile so it uses the
+				     ticketmaster_test database (see src/test/resources/application-test.properties),
+				     isolating it from the default `ticketmaster` and demo `ticketmaster_dev` DBs. -->
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-surefire-plugin</artifactId>
+				<configuration>
+					<systemPropertyVariables>
+						<spring.profiles.active>test</spring.profiles.active>
+					</systemPropertyVariables>
+				</configuration>
+			</plugin>
+			<plugin>
 				<groupId>org.jacoco</groupId>
 				<artifactId>jacoco-maven-plugin</artifactId>
 				<version>0.8.12</version>
