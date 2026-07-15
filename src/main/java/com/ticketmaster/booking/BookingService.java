@@ -79,18 +79,11 @@ public class BookingService {
                 if (ticket.getStatus() != TicketStatus.AVAILABLE)
                     throw new TicketUnavailableException("Ticket %d unavailable".formatted(ticket.getId()));
 
-            // 6. hold tickets
+            int totalCents = tickets.stream().mapToInt(Ticket::getPriceCents).sum();
+
+            // 6. book!
             ZonedDateTime expiresAt = ZonedDateTime.now()
                                                    .plusMinutes(10);
-            int totalCents = 0;
-            for (Ticket ticket : tickets) {
-                ticket.setStatus(TicketStatus.HELD);
-                ticket.setHoldExpiresAt(expiresAt);
-                totalCents += ticket.getPriceCents();
-            }
-            ticketRepository.saveAll(tickets);
-
-            // 7. book!
             Booking booking = new Booking();
             booking.setUser(userRepository.findById(userId)
                                           .orElseThrow(() -> new NoSuchElementException("User not found: " + userId)));
@@ -101,6 +94,15 @@ public class BookingService {
             booking.setIdempotencyKey(idempotencyKey);
             booking.setExpiresAt(expiresAt.toInstant());
             bookingRepository.save(booking);
+
+            // 7. hold tickets
+            for (Ticket ticket : tickets) {
+                ticket.setStatus(TicketStatus.HELD);
+                ticket.setHoldExpiresAt(expiresAt);
+                ticket.setBooking(booking);
+            }
+            ticketRepository.saveAll(tickets);
+            
             return booking;
         });
     }

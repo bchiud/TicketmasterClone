@@ -93,6 +93,12 @@ class BookingExpirySweepTest {
         booking.setExpiresAt(Instant.now().minusSeconds(60)); // already past its hold window
         bookingId = bookingRepository.save(booking).getId();
 
+        // Ticket owns the association (mappedBy = "booking"), so link the owning side and persist,
+        // mirroring how BookingService.hold() populates it. Setting only booking.setTickets(...)
+        // (the inverse side) would not write the FK, and the sweep would find no tickets to release.
+        ticket.setBooking(booking);
+        ticketRepository.save(ticket);
+
         bookingService.expire();
 
         assertThat(bookingRepository.findById(bookingId)).get()
@@ -103,8 +109,10 @@ class BookingExpirySweepTest {
 
     @AfterEach
     void cleanup() {
-        if (bookingId != null) bookingRepository.deleteById(bookingId);
+        // FK order: tickets.booking_id now references bookings, so the ticket must go before the
+        // booking. (Children first: ticket -> booking -> event/seat -> venue -> user.)
         if (ticketId != null) ticketRepository.deleteById(ticketId);
+        if (bookingId != null) bookingRepository.deleteById(bookingId);
         if (eventId != null) eventRepository.deleteById(eventId);
         if (seatId != null) seatRepository.deleteById(seatId);
         if (venueId != null) venueRepository.deleteById(venueId);

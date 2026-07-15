@@ -34,10 +34,12 @@ SELECT id FROM bookings
 WHERE event_id IN (SELECT id FROM _seed_events)
    OR user_id  IN (SELECT id FROM users WHERE email IN ('alice@dev.seed', 'bob@dev.seed'));
 
--- bookings_tickets is the join table behind Booking's ticket collection; it pins both
--- sides, so it has to go before either.
-DELETE FROM bookings_tickets WHERE booking_id IN (SELECT id FROM _seed_bookings)
-                                OR tickets_id IN (SELECT id FROM tickets WHERE event_id IN (SELECT id FROM _seed_events));
+-- The Booking->Ticket link is the tickets.booking_id FK (Ticket owns it). Release any ticket
+-- that points at a booking we're about to delete -- including legacy-event tickets a seed user
+-- booked, which we keep -- so the FK no longer blocks the booking delete. (seed-event tickets are
+-- deleted outright below anyway.)
+UPDATE tickets SET booking_id = NULL, status = 'AVAILABLE', hold_expires_at = NULL
+ WHERE booking_id IN (SELECT id FROM _seed_bookings);
 DELETE FROM payments WHERE booking_id IN (SELECT id FROM _seed_bookings);
 DELETE FROM bookings WHERE id         IN (SELECT id FROM _seed_bookings);
 DELETE FROM tickets  WHERE event_id   IN (SELECT id FROM _seed_events);

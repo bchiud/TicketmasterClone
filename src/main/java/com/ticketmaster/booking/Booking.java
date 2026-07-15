@@ -28,7 +28,7 @@ public class Booking {
     @ManyToOne
     private Event event;
 
-    @OneToMany
+    @OneToMany(mappedBy = "booking")
     private List<Ticket> tickets;
 
     @Enumerated(EnumType.STRING)
