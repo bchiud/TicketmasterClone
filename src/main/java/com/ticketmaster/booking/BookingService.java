@@ -76,8 +76,8 @@ public class BookingService {
 
             // 5. validate availability
             for (Ticket ticket : tickets)
-                if (ticket.getStatus() != TicketStatus.AVAILABLE) throw new TicketUnavailableException(
-                        "Ticket %d unavailable".formatted(ticket.getId()));
+                if (ticket.getStatus() != TicketStatus.AVAILABLE)
+                    throw new TicketUnavailableException("Ticket %d unavailable".formatted(ticket.getId()));
 
             // 6. hold tickets
             ZonedDateTime expiresAt = ZonedDateTime.now()
@@ -93,8 +93,7 @@ public class BookingService {
             // 7. book!
             Booking booking = new Booking();
             booking.setUser(userRepository.findById(userId)
-                                          .orElseThrow(
-                                                  () -> new NoSuchElementException("User not found: " + userId)));
+                                          .orElseThrow(() -> new NoSuchElementException("User not found: " + userId)));
             booking.setEvent(event);
             booking.setTickets(tickets);
             booking.setStatus(BookingStatus.PENDING);
@@ -109,8 +108,8 @@ public class BookingService {
     @Transactional
     public Booking confirm(long bookingId) {
         Booking booking = bookingRepository.findById(bookingId)
-                                           .orElseThrow(
-                                                   () -> new NoSuchElementException("Booking not found: " + bookingId));
+                                           .orElseThrow(() -> new NoSuchElementException(
+                                                   "Booking not found: " + bookingId));
 
         if (!booking.getStatus()
                     .equals(BookingStatus.PENDING)) throw new InvalidBookingState("Booking not pending");
@@ -141,13 +140,20 @@ public class BookingService {
         for (Booking booking : bookings) {
             try {
                 transactionTemplate.execute(status -> {
-                    booking.setStatus(BookingStatus.EXPIRED);
-                    for (Ticket ticket : booking.getTickets()) {
+                    // bookings loaded above are already detached
+                    // since @OneToMany is Lazy, List<Ticket> tickets is Lazy
+                    // calling it results in LazyInitializationException ("could not initialize proxy — no Session")
+                    // so we need to reload the booking to get the tickets
+                    Booking attachedBooking = bookingRepository.findById(booking.getId())
+                                                               .orElseThrow(() -> new NoSuchElementException(
+                                                                       "Booking not found: " + booking.getId()));
+                    attachedBooking.setStatus(BookingStatus.EXPIRED);
+                    for (Ticket ticket : attachedBooking.getTickets()) {
                         ticket.setStatus(TicketStatus.AVAILABLE);
                         ticket.setHoldExpiresAt(null);
                     }
-                    ticketRepository.saveAll(booking.getTickets());
-                    bookingRepository.save(booking);
+                    // entities loaded within the transaction are attached
+                    // thus no need to explicitly call repository.save()
                     return null;
                 });
             } catch (Exception e) {
@@ -159,13 +165,12 @@ public class BookingService {
     @Transactional
     public Booking cancel(long bookingId) {
         Booking booking = bookingRepository.findById(bookingId)
-                                           .orElseThrow(
-                                                   () -> new NoSuchElementException("Booking not found: " + bookingId));
+                                           .orElseThrow(() -> new NoSuchElementException(
+                                                   "Booking not found: " + bookingId));
 
         // BookingStatus.CONFIRMED for refund flow
         if (!EnumSet.of(BookingStatus.PENDING, BookingStatus.CONFIRMED)
-                    .contains(booking.getStatus()))
-            throw new InvalidBookingState("Booking not pending or confirmed");
+                    .contains(booking.getStatus())) throw new InvalidBookingState("Booking not pending or confirmed");
 
         booking.setStatus(BookingStatus.CANCELLED);
         for (Ticket ticket : booking.getTickets()) {
