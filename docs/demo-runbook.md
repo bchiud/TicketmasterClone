@@ -83,6 +83,22 @@ curl -s "$BASE/events?status=ON_SALE" | jq
 # filter by name (case-insensitive substring)
 curl -s "$BASE/events?name=jazz" | jq
 
+# filter by city (matched via the venue join, case-insensitive)
+curl -s "$BASE/events?city=san%20francisco" | jq
+
+# filter by performer (case-insensitive substring)
+curl -s "$BASE/events?performer=phoebe" | jq          # -> the queued Fever Dream Tour
+
+# filter by start-time range (ISO-8601). seed events start ~30 days out, so a today..+60d
+# window includes them, while an upper bound of "now" excludes them (they're in the future):
+FROM=$(date -u +%Y-%m-%dT00:00:00Z)
+TO=$(date -u -v+60d +%Y-%m-%dT00:00:00Z)               # BSD/macOS date syntax
+curl -s "$BASE/events?from=$FROM&to=$TO" | jq          # -> both seed events
+curl -s "$BASE/events?to=$FROM" | jq                   # -> []  (nothing starts before today)
+
+# filters are ANDed together: on-sale "jazz" events in SF
+curl -s "$BASE/events?status=ON_SALE&city=san%20francisco&name=jazz" | jq
+
 # a single event, and the venue list
 curl -s $BASE/events/$OPEN | jq
 curl -s $BASE/venues | jq
@@ -90,9 +106,6 @@ curl -s $BASE/venues | jq
 # tickets for an event (note the AVAILABLE status)
 curl -s $BASE/events/$OPEN/tickets | jq
 ```
-
-> Only `name` and `status` filters exist today; city / date-range / performer filters are the
-> next planned item.
 
 ---
 
@@ -272,7 +285,7 @@ Then re-run from step 2.
 
 | Method & path | Purpose |
 |---|---|
-| `GET /events?name=&status=` | Browse / filter events |
+| `GET /events?name=&status=&city=&performer=&from=&to=` | Browse / filter events (all optional, ANDed) |
 | `GET /events/{id}` | One event |
 | `GET /events/{id}/tickets` | Tickets for an event |
 | `POST /events` | Create event (needs a venue with seats) |

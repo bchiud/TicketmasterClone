@@ -4,6 +4,7 @@ import com.ticketmaster.venue.VenueHasNoSeatsException;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
@@ -35,9 +36,13 @@ class EventControllerTest {
     @MockitoBean
     private EventService eventService;
 
+    // filtering now delegates to a Specification built in the controller; the spec is opaque to
+    // MockMvc, so these tests verify wiring + param binding only. The predicate semantics (name,
+    // status, city, performer, date range) are covered against real Postgres in EventSpecificationsTest.
+
     @Test
     void getAllEventsReturnsEmptyListWhenNoneExist() throws Exception {
-        when(eventRepository.findAll()).thenReturn(List.of());
+        when(eventRepository.findAll(any(Specification.class))).thenReturn(List.of());
 
         mockMvc.perform(get("/events"))
                .andExpect(status().isOk())
@@ -49,7 +54,7 @@ class EventControllerTest {
         Event event = new Event();
         event.setId(1L);
         event.setName("Test Concert");
-        when(eventRepository.findAll()).thenReturn(List.of(event));
+        when(eventRepository.findAll(any(Specification.class))).thenReturn(List.of(event));
 
         mockMvc.perform(get("/events"))
                .andExpect(status().isOk())
@@ -57,43 +62,21 @@ class EventControllerTest {
     }
 
     @Test
-    void getAllEventsFiltersByNameWhenOnlyNameGiven() throws Exception {
+    void getAllEventsAcceptsAllFilterParams() throws Exception {
         Event event = new Event();
         event.setId(1L);
         event.setName("Summer Jam");
-        when(eventRepository.findByNameContainingIgnoreCase("summer")).thenReturn(List.of(event));
+        when(eventRepository.findAll(any(Specification.class))).thenReturn(List.of(event));
 
-        mockMvc.perform(get("/events").param("name", "summer"))
+        // all six params, including the ISO-8601 ZonedDateTime range, must bind (else 400)
+        mockMvc.perform(get("/events").param("name", "summer")
+                                      .param("status", "ON_SALE")
+                                      .param("city", "New York")
+                                      .param("performer", "miles")
+                                      .param("from", "2026-01-01T00:00:00Z")
+                                      .param("to", "2026-12-31T00:00:00Z"))
                .andExpect(status().isOk())
                .andExpect(jsonPath("$[0].name").value("Summer Jam"));
-    }
-
-    @Test
-    void getAllEventsFiltersByStatusWhenOnlyStatusGiven() throws Exception {
-        Event event = new Event();
-        event.setId(1L);
-        event.setStatus(EventStatus.ON_SALE);
-        when(eventRepository.findByStatus(EventStatus.ON_SALE)).thenReturn(List.of(event));
-
-        mockMvc.perform(get("/events").param("status", "ON_SALE"))
-               .andExpect(status().isOk())
-               .andExpect(jsonPath("$[0].status").value("ON_SALE"));
-    }
-
-    @Test
-    void getAllEventsFiltersByNameAndStatusWhenBothGiven() throws Exception {
-        Event event = new Event();
-        event.setId(1L);
-        event.setName("Summer Jam");
-        event.setStatus(EventStatus.ON_SALE);
-        when(eventRepository.findByNameContainingIgnoreCaseAndStatus("summer", EventStatus.ON_SALE))
-                .thenReturn(List.of(event));
-
-        mockMvc.perform(get("/events").param("name", "summer")
-                                      .param("status", "ON_SALE"))
-               .andExpect(status().isOk())
-               .andExpect(jsonPath("$[0].name").value("Summer Jam"))
-               .andExpect(jsonPath("$[0].status").value("ON_SALE"));
     }
 
     @Test
