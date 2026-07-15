@@ -79,7 +79,9 @@ public class BookingService {
                 if (ticket.getStatus() != TicketStatus.AVAILABLE)
                     throw new TicketUnavailableException("Ticket %d unavailable".formatted(ticket.getId()));
 
-            int totalCents = tickets.stream().mapToInt(Ticket::getPriceCents).sum();
+            int totalCents = tickets.stream()
+                                    .mapToInt(Ticket::getPriceCents)
+                                    .sum();
 
             // 6. book!
             ZonedDateTime expiresAt = ZonedDateTime.now()
@@ -102,7 +104,7 @@ public class BookingService {
                 ticket.setBooking(booking);
             }
             ticketRepository.saveAll(tickets);
-            
+
             return booking;
         });
     }
