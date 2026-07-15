@@ -8,10 +8,43 @@
 -- Boot the dev profile at least once first so Hibernate (ddl-auto=update) has created the
 -- tables:  ./mvnw spring-boot:run -Dspring-boot.run.profiles=dev
 --
+-- Idempotent: it clears its own previously-seeded rows before inserting, so you can re-run
+-- it directly (no separate reset needed) without colliding on the users.email constraint.
+--
 -- Everything here is tagged 'dev-seed' in users.name and events.name so scripts/reset-dev.sql
 -- can find and remove exactly these rows.
 
 BEGIN;
+
+-- Clear any rows a previous run of THIS script created, plus bookings/payments made against
+-- them, so the inserts below never collide. Scoped strictly to '[dev-seed]'-tagged rows (and
+-- the two seed emails) and their descendants; nothing else is touched. For a deeper clean that
+-- also removes legacy CommandLineRunner rows, use scripts/reset-dev.sql.
+CREATE TEMP TABLE _seed_events ON COMMIT DROP AS
+SELECT id FROM events WHERE name LIKE '%[dev-seed]%';
+
+CREATE TEMP TABLE _seed_venues ON COMMIT DROP AS
+SELECT id FROM venues WHERE name LIKE '%[dev-seed]%';
+
+-- Bookings to clear = anything on a seed event OR made by a seed user. The user clause matters
+-- because a seed user may have booked a non-seed event (e.g. a legacy CommandLineRunner event);
+-- those bookings still reference the user we're about to delete, so they must go first.
+CREATE TEMP TABLE _seed_bookings ON COMMIT DROP AS
+SELECT id FROM bookings
+WHERE event_id IN (SELECT id FROM _seed_events)
+   OR user_id  IN (SELECT id FROM users WHERE email IN ('alice@dev.seed', 'bob@dev.seed'));
+
+-- bookings_tickets is the join table behind Booking's ticket collection; it pins both
+-- sides, so it has to go before either.
+DELETE FROM bookings_tickets WHERE booking_id IN (SELECT id FROM _seed_bookings)
+                                OR tickets_id IN (SELECT id FROM tickets WHERE event_id IN (SELECT id FROM _seed_events));
+DELETE FROM payments WHERE booking_id IN (SELECT id FROM _seed_bookings);
+DELETE FROM bookings WHERE id         IN (SELECT id FROM _seed_bookings);
+DELETE FROM tickets  WHERE event_id   IN (SELECT id FROM _seed_events);
+DELETE FROM events   WHERE id         IN (SELECT id FROM _seed_events);
+DELETE FROM seats    WHERE venue_id   IN (SELECT id FROM _seed_venues);
+DELETE FROM venues   WHERE id         IN (SELECT id FROM _seed_venues);
+DELETE FROM users    WHERE email IN ('alice@dev.seed', 'bob@dev.seed');
 
 WITH venue AS (
     INSERT INTO venues (name, address, city)
@@ -75,3 +108,5 @@ COMMIT;
 -- escape hatch, the backlog and the drain, boot with the dev profile:
 --
 --   ./mvnw spring-boot:run -Dspring-boot.run.profiles=dev   (admit-rate=2, tick=5s)
+--
+-- Full step-by-step walkthrough: docs/demo-runbook.md
