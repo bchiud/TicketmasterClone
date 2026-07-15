@@ -6,6 +6,7 @@ import com.ticketmaster.event.EventNotOnSaleException;
 import com.ticketmaster.queue.QueueAccessRequiredException;
 import com.ticketmaster.ticket.TicketLimitedExceededException;
 import com.ticketmaster.ticket.TicketUnavailableException;
+import com.ticketmaster.venue.VenueHasNoSeatsException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -68,6 +69,12 @@ public class ApiExceptionHandler {
     @ExceptionHandler(TicketUnavailableException.class)
     public ResponseEntity<String> handleTicketUnavailable(TicketUnavailableException ex) {
         return ResponseEntity.status(HttpStatus.CONFLICT)
+                             .body(ex.getMessage());
+    }
+
+    @ExceptionHandler(VenueHasNoSeatsException.class)
+    public ResponseEntity<String> handleVenueHasNoSeatsException(VenueHasNoSeatsException ex) {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                              .body(ex.getMessage());
     }
 }

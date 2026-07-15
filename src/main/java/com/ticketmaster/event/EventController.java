@@ -1,5 +1,7 @@
 package com.ticketmaster.event;
 
+import jakarta.validation.Valid;
+import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -10,29 +12,34 @@ import java.util.NoSuchElementException;
 public class EventController {
     private final EventRepository eventRepository;
     private final EventCancellationService eventCancellationService;
+    private final EventService eventService;
 
-    public EventController(EventRepository eventRepository, EventCancellationService eventCancellationService) {
+    public EventController(EventRepository eventRepository, EventCancellationService eventCancellationService,
+                           EventService eventService) {
         this.eventRepository = eventRepository;
         this.eventCancellationService = eventCancellationService;
+        this.eventService = eventService;
     }
 
-    @GetMapping
+    @GetMapping("")
     public List<Event> getAllEvents(@RequestParam(required = false) String name,
                                     @RequestParam(required = false) EventStatus status) {
-        if (name == null && status == null)
-            return eventRepository.findAll();
-        else if (name == null)
-            return eventRepository.findByStatus(status);
-        else if (status == null)
-            return eventRepository.findByNameContainingIgnoreCase(name);
-        else
-            return eventRepository.findByNameContainingIgnoreCaseAndStatus(name, status);
+        if (name == null && status == null) return eventRepository.findAll();
+        else if (name == null) return eventRepository.findByStatus(status);
+        else if (status == null) return eventRepository.findByNameContainingIgnoreCase(name);
+        else return eventRepository.findByNameContainingIgnoreCaseAndStatus(name, status);
     }
 
     @GetMapping("/{id}")
     public Event getEventById(@PathVariable Long id) {
         return eventRepository.findById(id)
                               .orElseThrow(() -> new NoSuchElementException("Event not found: " + id));
+    }
+
+    @PostMapping("")
+    @ResponseStatus(HttpStatus.CREATED)
+    public Event createEvent(@Valid @RequestBody EventCreateRequest eventCreateRequest) {
+        return eventService.createEvent(eventCreateRequest);
     }
 
     @PostMapping("/{id}/cancel")

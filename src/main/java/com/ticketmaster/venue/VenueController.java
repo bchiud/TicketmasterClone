@@ -18,11 +18,11 @@ public class VenueController {
 
     @PostMapping("")
     @ResponseStatus(HttpStatus.CREATED)
-    public Venue createVenue(@Valid @RequestBody CreateVenueRequest createVenueRequest) {
+    public Venue createVenue(@Valid @RequestBody VenueCreateRequest venueCreateRequest) {
         Venue venue = new Venue();
-        venue.setName(createVenueRequest.getName());
-        venue.setAddress(createVenueRequest.getAddress());
-        venue.setCity(createVenueRequest.getCity());
+        venue.setName(venueCreateRequest.getName());
+        venue.setAddress(venueCreateRequest.getAddress());
+        venue.setCity(venueCreateRequest.getCity());
         return venueRepository.save(venue);
     }
 

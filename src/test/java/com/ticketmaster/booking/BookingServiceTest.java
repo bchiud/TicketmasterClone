@@ -12,6 +12,7 @@ import com.ticketmaster.seat.SeatRepository;
 import com.ticketmaster.ticket.Ticket;
 import com.ticketmaster.ticket.TicketLimitedExceededException;
 import com.ticketmaster.ticket.TicketRepository;
+import com.ticketmaster.ticket.TicketService;
 import com.ticketmaster.ticket.TicketStatus;
 import com.ticketmaster.ticket.TicketUnavailableException;
 import com.ticketmaster.user.User;
@@ -36,7 +37,7 @@ import static org.mockito.Mockito.when;
 
 @DataJpaTest
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
-@Import({BookingService.class, EventService.class})
+@Import({BookingService.class, EventService.class, TicketService.class})
 class BookingServiceTest {
 
     @Autowired

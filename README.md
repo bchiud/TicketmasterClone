@@ -36,13 +36,30 @@ A backend for the classic "design a ticket booking system" problem — see
 - A local Redis instance reachable at `localhost:6379` (no auth). Used for
   the queue package's waiting-room state and access tokens.
 
+- Optional, only for the `dev` demo profile: a separate `ticketmaster_dev`
+  database. The dev profile points there so hand-driven curl walks (which
+  commit real rows that don't roll back) can't pollute the `ticketmaster`
+  database the test suite runs against.
+
+  ```bash
+  createdb ticketmaster_dev
+  ```
+
 ## Running
 
 ```bash
 ./mvnw spring-boot:run
 ```
 
-The app starts on the default port (8080).
+The app starts on the default port (8080), against the `ticketmaster` database.
+
+For a hands-on demo with the waiting room made visible (low admit rate) and
+against the isolated `ticketmaster_dev` database:
+
+```bash
+./mvnw spring-boot:run -Dspring-boot.run.profiles=dev
+psql -d ticketmaster_dev -f scripts/seed-dev.sql   # optional demo data
+```
 
 ## Testing
 

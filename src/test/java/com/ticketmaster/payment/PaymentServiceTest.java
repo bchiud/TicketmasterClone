@@ -14,6 +14,7 @@ import com.ticketmaster.seat.Seat;
 import com.ticketmaster.seat.SeatRepository;
 import com.ticketmaster.ticket.Ticket;
 import com.ticketmaster.ticket.TicketRepository;
+import com.ticketmaster.ticket.TicketService;
 import com.ticketmaster.ticket.TicketStatus;
 import com.ticketmaster.user.User;
 import com.ticketmaster.user.UserRepository;
@@ -36,7 +37,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 @DataJpaTest
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
-@Import({BookingService.class, PaymentService.class, EventService.class})
+@Import({BookingService.class, PaymentService.class, EventService.class, TicketService.class})
 class PaymentServiceTest {
 
     @Autowired

@@ -6,7 +6,7 @@ import lombok.Setter;
 
 @Getter
 @Setter
-public class CreateVenueRequest {
+public class VenueCreateRequest {
     @NotBlank
     private String name;
     @NotBlank

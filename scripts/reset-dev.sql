@@ -1,6 +1,6 @@
 -- Removes everything scripts/seed-dev.sql created, plus any bookings/payments made against it.
 --
---   psql -d ticketmaster -f scripts/reset-dev.sql
+--   psql -d ticketmaster_dev -f scripts/reset-dev.sql
 --
 -- Deletes ONLY seed-tagged rows and their descendants. Never truncates, so any data you
 -- created yourself (and anything the test suite committed) is left alone.

@@ -1,16 +1,15 @@
--- Seeds enough data to walk the full booking flow by hand.
+-- Seeds enough data to walk the full booking flow by hand, against the dev database.
 --
---   psql -d ticketmaster -f scripts/seed-dev.sql
+--   psql -d ticketmaster_dev -f scripts/seed-dev.sql
 --
--- The app has no write API, so without this there is no way to create an event with
--- requires_queue = true, and the queue package is unreachable at runtime.
+-- A shortcut past the write API (POST /venues, POST /events): one command gives you a
+-- venue with seats plus a queue-gated and an open event, rather than several curl calls.
 --
--- Run the app at least once first so Hibernate (ddl-auto=update) has created the tables.
+-- Boot the dev profile at least once first so Hibernate (ddl-auto=update) has created the
+-- tables:  ./mvnw spring-boot:run -Dspring-boot.run.profiles=dev
 --
 -- Everything here is tagged 'dev-seed' in users.name and events.name so scripts/reset-dev.sql
--- can find and remove exactly these rows. Emails are deliberately @dev.seed rather than
--- @example.com: the test suite commits against this same database and hardcodes
--- alice@example.com / bob@example.com, and users.email is unique.
+-- can find and remove exactly these rows.
 
 BEGIN;
 

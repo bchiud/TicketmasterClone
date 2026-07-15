@@ -1,8 +1,10 @@
 package com.ticketmaster.event;
 
+import com.ticketmaster.venue.VenueHasNoSeatsException;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
+import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -10,6 +12,9 @@ import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.Optional;
 
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -26,6 +31,9 @@ class EventControllerTest {
 
     @MockitoBean
     private EventCancellationService eventCancellationService;
+
+    @MockitoBean
+    private EventService eventService;
 
     @Test
     void getAllEventsReturnsEmptyListWhenNoneExist() throws Exception {
@@ -136,5 +144,67 @@ class EventControllerTest {
 
         mockMvc.perform(post("/events/99/cancel"))
                .andExpect(status().isNotFound());
+    }
+
+    private static final String VALID_CREATE_BODY = """
+            {"name":"Fan-out Fest","performer":"The Openers","venueId":1,
+             "startsAt":"2026-09-01T19:00:00Z","onSaleAt":"2026-07-01T10:00:00Z",
+             "priceCents":8000,"requiresQueue":true}
+            """;
+
+    @Test
+    void createEventReturns201AndTheCreatedEvent() throws Exception {
+        Event created = new Event();
+        created.setId(5L);
+        created.setName("Fan-out Fest");
+        when(eventService.createEvent(any(EventCreateRequest.class))).thenReturn(created);
+
+        mockMvc.perform(post("/events").contentType(MediaType.APPLICATION_JSON)
+                                       .content(VALID_CREATE_BODY))
+               .andExpect(status().isCreated())
+               .andExpect(jsonPath("$.id").value(5))
+               .andExpect(jsonPath("$.name").value("Fan-out Fest"));
+    }
+
+    @Test
+    void createEventRejectsMissingFields() throws Exception {
+        mockMvc.perform(post("/events").contentType(MediaType.APPLICATION_JSON)
+                                       .content("{}"))
+               .andExpect(status().isBadRequest());
+
+        verify(eventService, never()).createEvent(any());
+    }
+
+    @Test
+    void createEventRejectsNonPositivePrice() throws Exception {
+        String zeroPrice = VALID_CREATE_BODY.replace("\"priceCents\":8000", "\"priceCents\":0");
+
+        mockMvc.perform(post("/events").contentType(MediaType.APPLICATION_JSON)
+                                       .content(zeroPrice))
+               .andExpect(status().isBadRequest());
+
+        verify(eventService, never()).createEvent(any());
+    }
+
+    // the service throws for an unknown venue; the controller must surface it as 404 via ApiExceptionHandler
+    @Test
+    void createEventReturns404WhenVenueNotFound() throws Exception {
+        when(eventService.createEvent(any(EventCreateRequest.class)))
+                .thenThrow(new NoSuchElementException("Venue not found: 1"));
+
+        mockMvc.perform(post("/events").contentType(MediaType.APPLICATION_JSON)
+                                       .content(VALID_CREATE_BODY))
+               .andExpect(status().isNotFound());
+    }
+
+    // ...and a seatless venue as 400
+    @Test
+    void createEventReturns400WhenVenueHasNoSeats() throws Exception {
+        when(eventService.createEvent(any(EventCreateRequest.class)))
+                .thenThrow(new VenueHasNoSeatsException("Venue has no seats: 1"));
+
+        mockMvc.perform(post("/events").contentType(MediaType.APPLICATION_JSON)
+                                       .content(VALID_CREATE_BODY))
+               .andExpect(status().isBadRequest());
     }
 }
