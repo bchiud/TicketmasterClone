@@ -1,5 +1,6 @@
 package com.ticketmaster.queue;
 
+import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -12,8 +13,8 @@ public class QueueController {
     private QueueService queueService;
 
     @PostMapping("/events/{id}/queue")
-    public String enqueue(@PathVariable Long id) {
-        return queueService.enqueue(id);
+    public String enqueue(@PathVariable Long id, HttpServletRequest request) {
+        return queueService.enqueue(id, request.getRemoteAddr());
     }
 
     @GetMapping("/events/{eventId}/queue/{token}")

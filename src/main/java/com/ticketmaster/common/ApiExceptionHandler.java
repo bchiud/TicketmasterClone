@@ -4,6 +4,7 @@ import com.ticketmaster.booking.InvalidBookingState;
 import com.ticketmaster.event.EventAlreadyCancelledException;
 import com.ticketmaster.event.EventNotOnSaleException;
 import com.ticketmaster.queue.QueueAccessRequiredException;
+import com.ticketmaster.queue.RateLimitException;
 import com.ticketmaster.ticket.TicketLimitedExceededException;
 import com.ticketmaster.ticket.TicketUnavailableException;
 import com.ticketmaster.venue.VenueHasNoSeatsException;
@@ -57,6 +58,12 @@ public class ApiExceptionHandler {
     @ExceptionHandler(QueueAccessRequiredException.class)
     public ResponseEntity<String> handleQueueAccessRequired(QueueAccessRequiredException ex) {
         return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                             .body(ex.getMessage());
+    }
+
+    @ExceptionHandler(RateLimitException.class)
+    public ResponseEntity<String> handleRateLimitException(RateLimitException ex) {
+        return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
                              .body(ex.getMessage());
     }
 

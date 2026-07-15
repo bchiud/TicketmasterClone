@@ -19,9 +19,18 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 @TestPropertySource(properties = {
         "queue.admit-rate=2",
         "queue.admit-interval-ms=3600000",
+        // this suite exercises queue mechanics, not the rate limiter; keep the limit high enough
+        // that repeated enqueues from one (event, ip) never trip it. rate limiting is covered in
+        // QueueServiceRateLimitTest.
+        "queue.enqueue-limit=1000",
+        "queue.enqueue-window-ms=3600000",
         "booking.expiry-sweep-interval-ms=3600000"
 })
 class QueueServiceTest {
+
+    // enqueue() is now per-(event, ip) rate limited; a fixed ip is fine because uniqueEventId()
+    // gives every test its own event, so the rate-limit key never collides across tests.
+    private static final String IP = "10.0.0.1";
 
     @Autowired
     private QueueService queueService;
@@ -45,8 +54,8 @@ class QueueServiceTest {
     void enqueueGrantsImmediateAccessUpToAdmitRateWhenBacklogEmpty() {
         Long eventId = uniqueEventId();
 
-        String first = queueService.enqueue(eventId);
-        String second = queueService.enqueue(eventId);
+        String first = queueService.enqueue(eventId, IP);
+        String second = queueService.enqueue(eventId, IP);
 
         assertThat(queueService.hasAccess(eventId, first)).isTrue();
         assertThat(queueService.hasAccess(eventId, second)).isTrue();
@@ -57,10 +66,10 @@ class QueueServiceTest {
     @Test
     void enqueueQueuesArrivalsBeyondAdmitRateWhenBacklogEmpty() {
         Long eventId = uniqueEventId();
-        queueService.enqueue(eventId); // consumes escape-hatch slot 1
-        queueService.enqueue(eventId); // consumes escape-hatch slot 2 (admit-rate=2)
+        queueService.enqueue(eventId, IP); // consumes escape-hatch slot 1
+        queueService.enqueue(eventId, IP); // consumes escape-hatch slot 2 (admit-rate=2)
 
-        String overflow = queueService.enqueue(eventId);
+        String overflow = queueService.enqueue(eventId, IP);
 
         assertThat(queueService.hasAccess(eventId, overflow)).isFalse();
         assertThat(queueService.getPosition(eventId, overflow)).isEqualTo(0);
@@ -69,12 +78,12 @@ class QueueServiceTest {
     @Test
     void enqueueAssignsFifoPositionsInOrderAmongQueuedArrivals() {
         Long eventId = uniqueEventId();
-        queueService.enqueue(eventId);
-        queueService.enqueue(eventId); // both consume the admit-rate=2 escape hatch
+        queueService.enqueue(eventId, IP);
+        queueService.enqueue(eventId, IP); // both consume the admit-rate=2 escape hatch
 
-        String first = queueService.enqueue(eventId);
-        String second = queueService.enqueue(eventId);
-        String third = queueService.enqueue(eventId);
+        String first = queueService.enqueue(eventId, IP);
+        String second = queueService.enqueue(eventId, IP);
+        String third = queueService.enqueue(eventId, IP);
 
         assertThat(queueService.getPosition(eventId, first)).isEqualTo(0);
         assertThat(queueService.getPosition(eventId, second)).isEqualTo(1);
@@ -90,16 +99,16 @@ class QueueServiceTest {
         Long eventId = uniqueEventId();
         String admittedCountKey = "queue:" + eventId + ":admitted-count";
 
-        queueService.enqueue(eventId);
-        queueService.enqueue(eventId); // consume the admit-rate=2 escape hatch
-        queueService.enqueue(eventId); // still finds an empty backlog, but is over rate -> queued
+        queueService.enqueue(eventId, IP);
+        queueService.enqueue(eventId, IP); // consume the admit-rate=2 escape hatch
+        queueService.enqueue(eventId, IP); // still finds an empty backlog, but is over rate -> queued
 
         // simulate the counter's TTL window lapsing while a backlog is still draining
         stringRedisTemplate.delete(admittedCountKey);
 
-        queueService.enqueue(eventId);
-        queueService.enqueue(eventId);
-        queueService.enqueue(eventId); // all three land on a backlog, so none should re-open the window
+        queueService.enqueue(eventId, IP);
+        queueService.enqueue(eventId, IP);
+        queueService.enqueue(eventId, IP); // all three land on a backlog, so none should re-open the window
 
         assertThat(stringRedisTemplate.opsForValue().get(admittedCountKey)).isNull();
 
@@ -108,7 +117,7 @@ class QueueServiceTest {
         assertThat(queueService.getPosition(eventId, "any")).isNull();
 
         // with the window untouched, the next arrival to find an empty queue gets the escape hatch
-        String afterDrain = queueService.enqueue(eventId);
+        String afterDrain = queueService.enqueue(eventId, IP);
 
         assertThat(queueService.hasAccess(eventId, afterDrain)).isTrue();
         assertThat(queueService.getPosition(eventId, afterDrain)).isNull();
@@ -121,7 +130,7 @@ class QueueServiceTest {
         Long cancelledEventId = eventRepository.save(event)
                                                .getId();
 
-        assertThatThrownBy(() -> queueService.enqueue(cancelledEventId))
+        assertThatThrownBy(() -> queueService.enqueue(cancelledEventId, IP))
                 .isInstanceOf(EventNotOnSaleException.class);
         // and no queue state was created for it
         assertThat(stringRedisTemplate.opsForSet()
@@ -130,7 +139,7 @@ class QueueServiceTest {
 
     @Test
     void enqueueRejectsAnUnknownEvent() {
-        assertThatThrownBy(() -> queueService.enqueue(999_999_999L))
+        assertThatThrownBy(() -> queueService.enqueue(999_999_999L, IP))
                 .isInstanceOf(NoSuchElementException.class);
     }
 
@@ -160,7 +169,7 @@ class QueueServiceTest {
         Long eventA = uniqueEventId();
         Long eventB = uniqueEventId();
 
-        String token = queueService.enqueue(eventA); // backlog empty, under admit-rate -> fast-tracked
+        String token = queueService.enqueue(eventA, IP); // backlog empty, under admit-rate -> fast-tracked
 
         assertThat(queueService.hasAccess(eventA, token)).isTrue();
         assertThat(queueService.hasAccess(eventB, token)).isFalse();
@@ -169,12 +178,12 @@ class QueueServiceTest {
     @Test
     void admitGrantsAccessUpToConfiguredRateFromBacklogInFifoOrder() {
         Long eventId = uniqueEventId();
-        queueService.enqueue(eventId);
-        queueService.enqueue(eventId); // consume the admit-rate=2 escape hatch
+        queueService.enqueue(eventId, IP);
+        queueService.enqueue(eventId, IP); // consume the admit-rate=2 escape hatch
 
-        String first = queueService.enqueue(eventId);
-        String second = queueService.enqueue(eventId);
-        String third = queueService.enqueue(eventId);
+        String first = queueService.enqueue(eventId, IP);
+        String second = queueService.enqueue(eventId, IP);
+        String third = queueService.enqueue(eventId, IP);
 
         queueService.admit(); // pops 2 of the 3 queued (admit-rate=2)
 
@@ -188,13 +197,13 @@ class QueueServiceTest {
     void admitAdmitsIndependentlyAcrossMultipleActiveEvents() {
         Long eventA = uniqueEventId();
         Long eventB = uniqueEventId();
-        queueService.enqueue(eventA);
-        queueService.enqueue(eventA); // consume eventA's escape hatch
-        queueService.enqueue(eventB);
-        queueService.enqueue(eventB); // consume eventB's escape hatch
+        queueService.enqueue(eventA, IP);
+        queueService.enqueue(eventA, IP); // consume eventA's escape hatch
+        queueService.enqueue(eventB, IP);
+        queueService.enqueue(eventB, IP); // consume eventB's escape hatch
 
-        String queuedA = queueService.enqueue(eventA);
-        String queuedB = queueService.enqueue(eventB);
+        String queuedA = queueService.enqueue(eventA, IP);
+        String queuedB = queueService.enqueue(eventB, IP);
 
         queueService.admit();
 
@@ -207,10 +216,10 @@ class QueueServiceTest {
         Long eventId = uniqueEventId();
         String q = "queue:" + eventId;
 
-        String fastTracked = queueService.enqueue(eventId); // escape-hatch grant -> access key
-        queueService.enqueue(eventId);                      // consume the admit-rate=2 hatch
-        queueService.enqueue(eventId);                      // queued -> backlog + seq + active-events
-        queueService.enqueue(eventId);
+        String fastTracked = queueService.enqueue(eventId, IP); // escape-hatch grant -> access key
+        queueService.enqueue(eventId, IP);                      // consume the admit-rate=2 hatch
+        queueService.enqueue(eventId, IP);                      // queued -> backlog + seq + active-events
+        queueService.enqueue(eventId, IP);
 
         // sanity: state is actually present before we purge
         assertThat(stringRedisTemplate.opsForZSet().zCard(q)).isGreaterThan(0);
@@ -229,12 +238,12 @@ class QueueServiceTest {
     @Test
     void checkStatusReflectsWaitingAdmittedAndInvalid() {
         Long eventId = uniqueEventId();
-        String escapeHatchToken = queueService.enqueue(eventId);
-        queueService.enqueue(eventId); // consume the admit-rate=2 escape hatch
+        String escapeHatchToken = queueService.enqueue(eventId, IP);
+        queueService.enqueue(eventId, IP); // consume the admit-rate=2 escape hatch
 
-        queueService.enqueue(eventId); // queued, will be popped by admit()
-        queueService.enqueue(eventId); // queued, will be popped by admit()
-        String waitingToken = queueService.enqueue(eventId); // queued, remains waiting
+        queueService.enqueue(eventId, IP); // queued, will be popped by admit()
+        queueService.enqueue(eventId, IP); // queued, will be popped by admit()
+        String waitingToken = queueService.enqueue(eventId, IP); // queued, remains waiting
 
         queueService.admit(); // pops 2 of the 3 queued
 

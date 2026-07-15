@@ -18,4 +18,9 @@ public class RedisScriptConfig {
     public RedisScript<List> admitCleanupScript() {
         return RedisScript.of(new ClassPathResource("scripts/admitCleanup.lua"), List.class);
     }
+
+    @Bean
+    public RedisScript<Long> rateLimitScript() {
+        return RedisScript.of(new ClassPathResource("scripts/rateLimit.lua"), Long.class);
+    }
 }

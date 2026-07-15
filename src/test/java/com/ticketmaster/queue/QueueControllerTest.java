@@ -7,6 +7,8 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 import static org.hamcrest.Matchers.nullValue;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -25,7 +27,7 @@ class QueueControllerTest {
 
     @Test
     void enqueueReturnsToken() throws Exception {
-        when(queueService.enqueue(42L)).thenReturn("token-abc");
+        when(queueService.enqueue(eq(42L), anyString())).thenReturn("token-abc");
 
         mockMvc.perform(post("/events/42/queue"))
                .andExpect(status().isOk())

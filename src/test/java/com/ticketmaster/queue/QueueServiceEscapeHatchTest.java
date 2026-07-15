@@ -18,9 +18,14 @@ import static org.assertj.core.api.Assertions.assertThat;
 @TestPropertySource(properties = {
         "queue.admit-rate=2",
         "queue.admit-interval-ms=200",
+        // not exercising the rate limiter here; keep it out of the way (see QueueServiceRateLimitTest)
+        "queue.enqueue-limit=1000",
+        "queue.enqueue-window-ms=3600000",
         "booking.expiry-sweep-interval-ms=3600000"
 })
 class QueueServiceEscapeHatchTest {
+
+    private static final String IP = "10.0.0.1";
 
     @Autowired
     private QueueService queueService;
@@ -44,12 +49,12 @@ class QueueServiceEscapeHatchTest {
         Long eventId = uniqueEventId();
 
         // admit-rate=2: first 2 fast-tracked, next 4 forced into the backlog
-        queueService.enqueue(eventId);
-        queueService.enqueue(eventId);
-        queueService.enqueue(eventId);
-        queueService.enqueue(eventId);
-        queueService.enqueue(eventId);
-        queueService.enqueue(eventId);
+        queueService.enqueue(eventId, IP);
+        queueService.enqueue(eventId, IP);
+        queueService.enqueue(eventId, IP);
+        queueService.enqueue(eventId, IP);
+        queueService.enqueue(eventId, IP);
+        queueService.enqueue(eventId, IP);
 
         assertThat(stringRedisTemplate.opsForZSet().zCard("queue:" + eventId)).isEqualTo(4);
 
@@ -61,7 +66,7 @@ class QueueServiceEscapeHatchTest {
         assertThat(stringRedisTemplate.opsForSet().isMember("queue:active-events", eventId.toString()))
                 .isFalse();
 
-        String newArrivalToken = queueService.enqueue(eventId);
+        String newArrivalToken = queueService.enqueue(eventId, IP);
 
         assertThat(queueService.hasAccess(eventId, newArrivalToken)).isTrue();
         assertThat(queueService.getPosition(eventId, newArrivalToken)).isNull();

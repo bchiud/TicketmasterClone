@@ -27,15 +27,26 @@ public class QueueService {
     @Autowired
     private EventService eventService;
     @Autowired
+    private RedisScript<Long> rateLimitScript;
+    @Autowired
     private StringRedisTemplate stringRedisTemplate;
 
     @Value("${queue.admit-rate:500}")
     private long admitRate;
     @Value("${queue.admit-interval-ms:1000}")
     private long admitIntervalMs;
+    @Value("${queue.enqueue-limit}")
+    private long enqueueLimit;
+    @Value("${queue.enqueue-window-ms}")
+    private long enqueueWindowMs;
 
-    public String enqueue(Long eventId) {
-        // chk if event exists AND is on sale
+    public String enqueue(Long eventId, String clientIp) {
+        Long enqueues = stringRedisTemplate.execute(rateLimitScript,
+                                                    List.of(getRateLimitKey(eventId, clientIp)),
+                                                    String.valueOf(enqueueWindowMs));
+        if (enqueues > enqueueLimit) throw new RateLimitException("Rate limit exceeded");
+
+        // chk event exists AND is on sale
         eventService.getEventIfOnSale(eventId);
 
         String eventKey = getEventKey(eventId);
@@ -50,8 +61,8 @@ public class QueueService {
             Long admittedCount = stringRedisTemplate.opsForValue()
                                                     .increment(eventAdmittedCountKey);
             // window self-clears every admitIntervalMs so the escape hatch reopens once traffic calms down
-            if (admittedCount == 1) stringRedisTemplate.expire(eventAdmittedCountKey,
-                                                               Duration.ofMillis(admitIntervalMs));
+            if (admittedCount == 1)
+                stringRedisTemplate.expire(eventAdmittedCountKey, Duration.ofMillis(admitIntervalMs));
 
             if (admittedCount <= admitRate) {
                 grantAccess(eventId, token);
@@ -63,7 +74,8 @@ public class QueueService {
         // vice versa)
         stringRedisTemplate.execute(enqueueScript,
                                     List.of(ACTIVE_EVENTS_KEY, getEventQueueSequenceKey(eventKey), eventKey),
-                                    eventId.toString(), token);
+                                    eventId.toString(),
+                                    token);
         return token;
     }
 
@@ -81,8 +93,10 @@ public class QueueService {
         for (String eventId : activeEvents) {
             String eventKey = getEventKey(Long.valueOf(eventId));
 
-            List<String> popped = stringRedisTemplate.execute(admitCleanupScript, List.of(eventKey, ACTIVE_EVENTS_KEY),
-                                                              String.valueOf(admitRate), eventId);
+            List<String> popped = stringRedisTemplate.execute(admitCleanupScript,
+                                                              List.of(eventKey, ACTIVE_EVENTS_KEY),
+                                                              String.valueOf(admitRate),
+                                                              eventId);
 
             // ZPOPMIN's flat reply alternates member/score - popped[i] is the token, popped[i+1] its sequence number
             for (int i = 0; i < popped.size(); i += 2) {
@@ -166,5 +180,9 @@ public class QueueService {
 
     private String getEventQueueSequenceKey(String eventKey) {
         return eventKey + ":seq";
+    }
+
+    private String getRateLimitKey(Long eventId, String clientIp) {
+        return "ratelimit:enqueue:" + eventId + ":" + clientIp;
     }
 }
