@@ -11,7 +11,16 @@ import lombok.Setter;
 import java.time.ZonedDateTime;
 
 @Entity
-@Table(name = "tickets", uniqueConstraints = @UniqueConstraint(columnNames = {"event_id", "seat_id"}))
+// @formatter:off
+@Table(
+        name = "tickets",
+        indexes = {
+                @Index(name = "idx_tickets_event_status", columnList = "event_id, status"),
+                @Index(name = "idx_tickets_hold_expiry", columnList = "status, hold_expires_at")
+        },
+        uniqueConstraints = @UniqueConstraint(columnNames = {"event_id", "seat_id"})
+)
+// @formatter:on
 @Getter
 @Setter
 @NoArgsConstructor
