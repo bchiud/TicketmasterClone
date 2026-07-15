@@ -5,6 +5,7 @@ import com.ticketmaster.booking.BookingRepository;
 import com.ticketmaster.booking.BookingService;
 import com.ticketmaster.booking.BookingStatus;
 import com.ticketmaster.payment.PaymentService;
+import com.ticketmaster.queue.QueueService;
 import com.ticketmaster.ticket.TicketService;
 import jakarta.transaction.Transactional;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -26,6 +27,8 @@ public class EventCancellationService {
     private EventRepository eventRepository;
     @Autowired
     private PaymentService paymentService;
+    @Autowired
+    private QueueService queueService;
     @Autowired
     private TicketService ticketService;
 
@@ -52,6 +55,8 @@ public class EventCancellationService {
         }
 
         ticketService.cancelTicketsbyEventId(eventId);
+
+        queueService.purgeEvent(eventId);
 
         return event;
     }

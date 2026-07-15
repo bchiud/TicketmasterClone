@@ -172,6 +172,30 @@ class QueueServiceTest {
     }
 
     @Test
+    void purgeEventRemovesAllQueueState() {
+        Long eventId = uniqueEventId();
+        String q = "queue:" + eventId;
+
+        String fastTracked = queueService.enqueue(eventId); // escape-hatch grant -> access key
+        queueService.enqueue(eventId);                      // consume the admit-rate=2 hatch
+        queueService.enqueue(eventId);                      // queued -> backlog + seq + active-events
+        queueService.enqueue(eventId);
+
+        // sanity: state is actually present before we purge
+        assertThat(stringRedisTemplate.opsForZSet().zCard(q)).isGreaterThan(0);
+        assertThat(stringRedisTemplate.opsForSet().isMember("queue:active-events", eventId.toString())).isTrue();
+
+        queueService.purgeEvent(eventId);
+
+        assertThat(stringRedisTemplate.opsForZSet().zCard(q)).isEqualTo(0);
+        assertThat(stringRedisTemplate.opsForSet().isMember("queue:active-events", eventId.toString())).isFalse();
+        assertThat(stringRedisTemplate.hasKey(q + ":seq")).isFalse();
+        assertThat(stringRedisTemplate.hasKey(q + ":admitted-count")).isFalse();
+        assertThat(stringRedisTemplate.keys("access:" + eventId + ":*")).isEmpty();
+        assertThat(queueService.hasAccess(eventId, fastTracked)).isFalse();
+    }
+
+    @Test
     void checkStatusReflectsWaitingAdmittedAndInvalid() {
         Long eventId = uniqueEventId();
         String escapeHatchToken = queueService.enqueue(eventId);

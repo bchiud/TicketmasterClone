@@ -32,6 +32,7 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.verify;
 
 @DataJpaTest
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
@@ -195,5 +196,16 @@ class EventCancellationServiceTest {
     void throwsWhenCancellingANonexistentEvent() {
         assertThatThrownBy(() -> eventCancellationService.cancelEvent(999L))
                 .isInstanceOf(NoSuchElementException.class);
+    }
+
+    // queueService is a @MockitoBean here (its Redis state lives outside JPA); the actual
+    // key teardown is covered live in QueueServiceTest.purgeEventRemovesAllQueueState.
+    @Test
+    void cancelEventPurgesTheEventsQueueState() {
+        Event event = saveEvent();
+
+        eventCancellationService.cancelEvent(event.getId());
+
+        verify(queueService).purgeEvent(event.getId());
     }
 }
