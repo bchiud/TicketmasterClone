@@ -276,11 +276,21 @@ redis-cli sismember queue:active-events $QUEUED   # (integer) 0
 
 ## 8. Reset between runs
 
-Remove exactly the seeded rows (handles FK order incl. the bookings↔tickets join table):
+**Targeted reset** — remove only the seeded rows, leaving anything else in the dev DB untouched
+(handles FK order, releasing each ticket's `booking_id` before deleting its booking):
 
 ```bash
 psql -d ticketmaster_dev -f scripts/reset-dev.sql
 redis-cli flushdb        # clear queue/access/rate-limit keys
+```
+
+**Full wipe** — blow away *everything* in the dev DB and reset the id sequences (so the next seed
+starts at venue 1, event 1, …). `CASCADE` handles FK order; `RESTART IDENTITY` restarts the
+sequences:
+
+```bash
+psql -d ticketmaster_dev -c "TRUNCATE TABLE payments, bookings, tickets, seats, events, venues, users RESTART IDENTITY CASCADE;"
+redis-cli flushdb
 ```
 
 Then re-run from step 2.
