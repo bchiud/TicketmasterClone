@@ -57,9 +57,10 @@ Split reads from writes into separate services so you can scale and optimize the
 - Availability counts can be *slightly* stale on the browse page — that's fine. Truth is enforced at booking time. This lets you serve the firehose of browsers cheaply.
 
 > **As built:** this project serves browse/search with structured Postgres filtering (JPA
-> Specifications over name / status / city / performer / date range) rather than a dedicated
-> Elasticsearch service — see [ADR-0004](adr/0004-event-search-jpa-specifications.md).
-> Elasticsearch, read replicas, and the CDN/cache tier above remain out-of-scope scale options.
+> Specifications over name / status / city / performer / date range), paginated and sortable
+> (`?page` / `size` / `sort`), rather than a dedicated Elasticsearch service — see
+> [ADR-0004](adr/0004-event-search-jpa-specifications.md). Elasticsearch, read replicas, and the
+> CDN/cache tier above remain out-of-scope scale options.
 
 ## 5. The Write Path — Booking (the hard part)
 
@@ -207,9 +208,10 @@ CREATE TABLE events (
     name        TEXT NOT NULL,
     performer   TEXT,
     venue_id    BIGINT REFERENCES venues(id),
-    starts_at   TIMESTAMPTZ NOT NULL,
-    on_sale_at  TIMESTAMPTZ,
-    status      TEXT DEFAULT 'SCHEDULED'   -- SCHEDULED / ON_SALE / SOLD_OUT / CANCELLED
+    starts_at      TIMESTAMPTZ NOT NULL,
+    on_sale_at     TIMESTAMPTZ,
+    status         TEXT DEFAULT 'SCHEDULED',   -- SCHEDULED / ON_SALE / SOLD_OUT / CANCELLED
+    requires_queue BOOLEAN DEFAULT false       -- if true, booking requires a queue access token (§11)
 );
 CREATE INDEX idx_events_starts_at ON events (starts_at);
 
@@ -262,6 +264,11 @@ CREATE TABLE payments (
 ## 11. Waiting-Queue Design (the on-sale spike)
 
 Goal: when millions arrive at `on_sale_at`, protect the booking DB by converting the mob into a throttled stream — and keep it fair (roughly first-come-first-served) and bot-resistant.
+
+> **As built:** the queue is opt-in **per event** via the `events.requires_queue` flag. Only events
+> with it set gate booking behind an access token; ordinary events book directly. Bot resistance at
+> queue entry is a per-IP rate limit on the join endpoint (429 when exceeded); ticket-per-user caps
+> are enforced at hold time.
 
 ### 11.1 Flow
 
