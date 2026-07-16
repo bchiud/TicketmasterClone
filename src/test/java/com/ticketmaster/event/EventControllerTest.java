@@ -1,9 +1,14 @@
 package com.ticketmaster.event;
 
+import com.ticketmaster.common.WebConfig;
 import com.ticketmaster.venue.VenueHasNoSeatsException;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
+import org.springframework.context.annotation.Import;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
@@ -22,6 +27,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @WebMvcTest(EventController.class)
+@Import(WebConfig.class)   // apply VIA_DTO Page serialization so the slice matches production JSON
 class EventControllerTest {
 
     @Autowired
@@ -41,12 +47,14 @@ class EventControllerTest {
     // status, city, performer, date range) are covered against real Postgres in EventSpecificationsTest.
 
     @Test
-    void getAllEventsReturnsEmptyListWhenNoneExist() throws Exception {
-        when(eventRepository.findAll(any(Specification.class))).thenReturn(List.of());
+    void getAllEventsReturnsEmptyPageWhenNoneExist() throws Exception {
+        when(eventRepository.findAll(any(Specification.class), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of()));
 
         mockMvc.perform(get("/events"))
                .andExpect(status().isOk())
-               .andExpect(content().json("[]"));
+               .andExpect(jsonPath("$.content").isArray())
+               .andExpect(jsonPath("$.content").isEmpty());
     }
 
     @Test
@@ -54,11 +62,12 @@ class EventControllerTest {
         Event event = new Event();
         event.setId(1L);
         event.setName("Test Concert");
-        when(eventRepository.findAll(any(Specification.class))).thenReturn(List.of(event));
+        when(eventRepository.findAll(any(Specification.class), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of(event)));
 
         mockMvc.perform(get("/events"))
                .andExpect(status().isOk())
-               .andExpect(jsonPath("$[0].name").value("Test Concert"));
+               .andExpect(jsonPath("$.content[0].name").value("Test Concert"));
     }
 
     @Test
@@ -66,7 +75,8 @@ class EventControllerTest {
         Event event = new Event();
         event.setId(1L);
         event.setName("Summer Jam");
-        when(eventRepository.findAll(any(Specification.class))).thenReturn(List.of(event));
+        when(eventRepository.findAll(any(Specification.class), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of(event)));
 
         // all six params, including the ISO-8601 ZonedDateTime range, must bind (else 400)
         mockMvc.perform(get("/events").param("name", "summer")
@@ -76,7 +86,7 @@ class EventControllerTest {
                                       .param("from", "2026-01-01T00:00:00Z")
                                       .param("to", "2026-12-31T00:00:00Z"))
                .andExpect(status().isOk())
-               .andExpect(jsonPath("$[0].name").value("Summer Jam"));
+               .andExpect(jsonPath("$.content[0].name").value("Summer Jam"));
     }
 
     @Test

@@ -1,11 +1,13 @@
 package com.ticketmaster.event;
 
 import jakarta.validation.Valid;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.ZonedDateTime;
-import java.util.List;
 import java.util.NoSuchElementException;
 
 @RestController
@@ -15,20 +17,23 @@ public class EventController {
     private final EventCancellationService eventCancellationService;
     private final EventService eventService;
 
-    public EventController(EventRepository eventRepository, EventCancellationService eventCancellationService, EventService eventService) {
+    public EventController(EventRepository eventRepository,
+                           EventCancellationService eventCancellationService,
+                           EventService eventService) {
         this.eventRepository = eventRepository;
         this.eventCancellationService = eventCancellationService;
         this.eventService = eventService;
     }
 
     @GetMapping("")
-    public List<Event> getAllEvents(
-            @RequestParam(required = false) String name,
-            @RequestParam(required = false) EventStatus status,
-            @RequestParam(required = false) String city,
-            @RequestParam(required = false) String performer,
-            @RequestParam(required = false) ZonedDateTime from, @RequestParam(required = false) ZonedDateTime to) {
-        return eventRepository.findAll(EventSpecifications.matching(name, status, city, performer, from, to));
+    public Page<Event> getAllEvents(@RequestParam(required = false) String name,
+                                    @RequestParam(required = false) EventStatus status,
+                                    @RequestParam(required = false) String city,
+                                    @RequestParam(required = false) String performer,
+                                    @RequestParam(required = false) ZonedDateTime from,
+                                    @RequestParam(required = false) ZonedDateTime to,
+                                    @PageableDefault(size = 20, sort = "startsAt") Pageable pageable) {
+        return eventRepository.findAll(EventSpecifications.matching(name, status, city, performer, from, to), pageable);
     }
 
     @GetMapping("/{id}")

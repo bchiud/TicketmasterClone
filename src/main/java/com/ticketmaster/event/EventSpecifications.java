@@ -8,7 +8,12 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class EventSpecifications {
-    public static Specification<Event> matching(String name, EventStatus status, String city, String performer, ZonedDateTime from, ZonedDateTime to) {
+    public static Specification<Event> matching(String name,
+                                                EventStatus status,
+                                                String city,
+                                                String performer,
+                                                ZonedDateTime from,
+                                                ZonedDateTime to) {
         return (root, query, cb) -> {
             List<Predicate> predicates = new ArrayList<>();
 
