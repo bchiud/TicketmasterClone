@@ -103,6 +103,9 @@ class BookingExpirySweepTest {
                 .extracting(Booking::getStatus).isEqualTo(BookingStatus.EXPIRED);
         assertThat(ticketRepository.findById(ticketId)).get()
                 .extracting(Ticket::getStatus).isEqualTo(TicketStatus.AVAILABLE);
+        // released tickets detach from the expired booking
+        assertThat(ticketRepository.findById(ticketId)).get()
+                .extracting(Ticket::getBooking).isNull();
     }
 
     @AfterEach

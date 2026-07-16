@@ -149,8 +149,10 @@ public class BookingService {
                                                                .orElseThrow(() -> new NoSuchElementException(
                                                                        "Booking not found: " + booking.getId()));
                     attachedBooking.setStatus(BookingStatus.EXPIRED);
-                    for (Ticket ticket : attachedBooking.getTickets())
+                    for (Ticket ticket : attachedBooking.getTickets()) {
                         ticket.setStatus(TicketStatus.AVAILABLE);
+                        ticket.setBooking(null);
+                    }
                     // entities loaded within the transaction are attached
                     // thus no need to explicitly call repository.save()
                     return null;
@@ -172,8 +174,10 @@ public class BookingService {
                     .contains(booking.getStatus())) throw new InvalidBookingState("Booking not pending or confirmed");
 
         booking.setStatus(BookingStatus.CANCELLED);
-        for (Ticket ticket : booking.getTickets())
+        for (Ticket ticket : booking.getTickets()) {
             ticket.setStatus(TicketStatus.AVAILABLE);
+            ticket.setBooking(null);
+        }
         ticketRepository.saveAll(booking.getTickets());
         bookingRepository.save(booking);
 

@@ -327,6 +327,8 @@ class BookingServiceTest {
                 .get()
                 .extracting(Ticket::getStatus)
                 .isEqualTo(TicketStatus.AVAILABLE);
+        assertThat(ticketRepository.findById(ticket.getId())).get()
+                .extracting(Ticket::getBooking).isNull();   // released ticket detaches from the booking
     }
 
     @Test
@@ -345,6 +347,8 @@ class BookingServiceTest {
                 .get()
                 .extracting(Ticket::getStatus)
                 .isEqualTo(TicketStatus.AVAILABLE);
+        assertThat(ticketRepository.findById(ticket.getId())).get()
+                .extracting(Ticket::getBooking).isNull();   // released ticket detaches from the booking
     }
 
     @Test
