@@ -19,7 +19,6 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.TestPropertySource;
 
 import java.time.Instant;
-import java.time.ZonedDateTime;
 import java.util.List;
 import java.util.UUID;
 
@@ -80,7 +79,6 @@ class BookingExpirySweepTest {
         ticket.setSeat(seat);
         ticket.setPriceCents(100);
         ticket.setStatus(TicketStatus.HELD);
-        ticket.setHoldExpiresAt(ZonedDateTime.now().minusMinutes(1));
         ticketId = ticketRepository.save(ticket).getId();
 
         Booking booking = new Booking();

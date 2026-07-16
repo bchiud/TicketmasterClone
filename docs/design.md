@@ -56,6 +56,11 @@ Split reads from writes into separate services so you can scale and optimize the
 - **Event/availability reads** served from **read replicas + a cache (Redis/CDN)**. Seat maps and event metadata are cached aggressively.
 - Availability counts can be *slightly* stale on the browse page — that's fine. Truth is enforced at booking time. This lets you serve the firehose of browsers cheaply.
 
+> **As built:** this project serves browse/search with structured Postgres filtering (JPA
+> Specifications over name / status / city / performer / date range) rather than a dedicated
+> Elasticsearch service — see [ADR-0004](adr/0004-event-search-jpa-specifications.md).
+> Elasticsearch, read replicas, and the CDN/cache tier above remain out-of-scope scale options.
+
 ## 5. The Write Path — Booking (the hard part)
 
 This is a **reserve → pay → confirm** flow with a seat *hold*:
@@ -132,11 +137,11 @@ VALUES (:booking_id, :user_id, :event_id, 'PENDING', now() + interval '8 minutes
 
 UPDATE tickets
 SET status = 'HELD',
-    held_by = :user_id,
-    booking_id = :booking_id,
-    hold_expires_at = now() + interval '8 minutes'
+    booking_id = :booking_id
 WHERE id = ANY(:seat_ids)
   AND status = 'AVAILABLE';   -- guard: only flips rows still free
+-- The hold window lives on the booking (bookings.expires_at); tickets carry no per-ticket
+-- expiry column, so the sweep is booking-level (see §9.4).
 
 -- Row count must equal len(seat_ids). If fewer, someone raced us → ROLLBACK.
 
@@ -170,7 +175,7 @@ Redis is the fast gatekeeper; the DB is still written asynchronously as the dura
 ### 9.4 Confirm & expiry
 
 - **Confirm (after payment):** in one DB transaction, verify the booking is still `PENDING` **and** `expires_at > now()`, then flip tickets → `BOOKED` and booking → `CONFIRMED`. If the hold already expired, refund/abort — never confirm a stale hold.
-- **Expiry sweep:** Redis TTL handles the in-memory locks automatically. For the DB, run a periodic job (or lazy check on read) that returns `HELD` rows whose `hold_expires_at < now()` back to `AVAILABLE`. Belt-and-suspenders: always re-check `expires_at` at confirm time so a slow sweeper can't cause a double-sell.
+- **Expiry sweep:** Redis TTL handles the in-memory locks automatically. For the DB, run a periodic job (or lazy check on read) that finds `PENDING` bookings whose `expires_at < now()` and, one transaction per booking, flips the booking → `EXPIRED` and its tickets back to `AVAILABLE`. The hold window lives on the **booking** (`bookings.expires_at`), so the sweep is booking-level — tickets carry no per-ticket expiry column. Belt-and-suspenders: always re-check `expires_at` at confirm time so a slow sweeper can't cause a double-sell.
 
 ### 9.5 Idempotency
 
@@ -214,15 +219,11 @@ CREATE TABLE tickets (               -- the sellable unit: seat × event
     seat_id         BIGINT REFERENCES seats(id),
     price_cents     INT NOT NULL,
     status          TEXT DEFAULT 'AVAILABLE',  -- AVAILABLE / HELD / BOOKED
-    held_by         BIGINT,                    -- user holding it, if any
-    hold_expires_at TIMESTAMPTZ,
     booking_id      BIGINT REFERENCES bookings(id),  -- the booking holding it; owns the link (see ADR-0003)
     UNIQUE (event_id, seat_id)                 -- a seat exists once per event
 );
--- Hot path indexes:
+-- Hot path index:
 CREATE INDEX idx_tickets_event_status ON tickets (event_id, status);
-CREATE INDEX idx_tickets_hold_expiry  ON tickets (hold_expires_at)
-    WHERE status = 'HELD';           -- partial index for the expiry sweeper
 
 CREATE TABLE users (
     id     BIGINT PRIMARY KEY,
@@ -256,7 +257,6 @@ CREATE TABLE payments (
 **Notes**
 - Pre-generating one `tickets` row per (seat, event) when an event goes on sale makes the seat map a simple query and gives you a concrete row to lock. For general-admission (no assigned seats), replace individual rows with an atomic **counter** (`available_count`) decremented under a lock or via Redis.
 - **Shard by `event_id`.** Contention is per-event, so events scale independently and a hot event's load stays isolated.
-- The partial index on `hold_expires_at` keeps the expiry sweeper cheap even with millions of tickets.
 - A booking's tickets are linked by the **`tickets.booking_id`** foreign key (on the many side), not an array column on `bookings`. This makes the FK the single source of truth and enforces "a ticket belongs to at most one booking" at the DB layer — see [ADR-0003](adr/0003-booking-ticket-association.md). (In the DDL above, `tickets.booking_id REFERENCES bookings(id)` is a forward reference; in practice the constraint is added once both tables exist.)
 
 ## 11. Waiting-Queue Design (the on-sale spike)

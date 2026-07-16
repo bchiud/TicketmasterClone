@@ -100,7 +100,6 @@ public class BookingService {
             // 7. hold tickets
             for (Ticket ticket : tickets) {
                 ticket.setStatus(TicketStatus.HELD);
-                ticket.setHoldExpiresAt(expiresAt);
                 ticket.setBooking(booking);
             }
             ticketRepository.saveAll(tickets);
@@ -121,10 +120,8 @@ public class BookingService {
                    .isBefore(Instant.now())) throw new InvalidBookingState("Booking expired");
 
         booking.setStatus(BookingStatus.CONFIRMED);
-        for (Ticket ticket : booking.getTickets()) {
+        for (Ticket ticket : booking.getTickets())
             ticket.setStatus(TicketStatus.BOOKED);
-            ticket.setHoldExpiresAt(null);
-        }
 
         ticketRepository.saveAll(booking.getTickets());
         bookingRepository.save(booking);
@@ -152,10 +149,8 @@ public class BookingService {
                                                                .orElseThrow(() -> new NoSuchElementException(
                                                                        "Booking not found: " + booking.getId()));
                     attachedBooking.setStatus(BookingStatus.EXPIRED);
-                    for (Ticket ticket : attachedBooking.getTickets()) {
+                    for (Ticket ticket : attachedBooking.getTickets())
                         ticket.setStatus(TicketStatus.AVAILABLE);
-                        ticket.setHoldExpiresAt(null);
-                    }
                     // entities loaded within the transaction are attached
                     // thus no need to explicitly call repository.save()
                     return null;
@@ -177,10 +172,8 @@ public class BookingService {
                     .contains(booking.getStatus())) throw new InvalidBookingState("Booking not pending or confirmed");
 
         booking.setStatus(BookingStatus.CANCELLED);
-        for (Ticket ticket : booking.getTickets()) {
+        for (Ticket ticket : booking.getTickets())
             ticket.setStatus(TicketStatus.AVAILABLE);
-            ticket.setHoldExpiresAt(null);
-        }
         ticketRepository.saveAll(booking.getTickets());
         bookingRepository.save(booking);
 

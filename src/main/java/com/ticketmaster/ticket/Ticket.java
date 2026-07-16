@@ -8,15 +8,12 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
-import java.time.ZonedDateTime;
-
 @Entity
 // @formatter:off
 @Table(
         name = "tickets",
         indexes = {
-                @Index(name = "idx_tickets_event_status", columnList = "event_id, status"),
-                @Index(name = "idx_tickets_hold_expiry", columnList = "status, hold_expires_at")
+                @Index(name = "idx_tickets_event_status", columnList = "event_id, status")
         },
         uniqueConstraints = @UniqueConstraint(columnNames = {"event_id", "seat_id"})
 )
@@ -39,10 +36,6 @@ public class Ticket {
 
     @Enumerated(EnumType.STRING)
     private TicketStatus status = TicketStatus.AVAILABLE;
-
-    private Long heldBy;
-
-    private ZonedDateTime holdExpiresAt;
 
     @ManyToOne
     private Booking booking;
