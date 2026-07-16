@@ -74,30 +74,36 @@ BASE=localhost:8080
 ## 4. Browse / discover (read side)
 
 ```bash
-# whole catalog
-curl -s $BASE/events | jq
+# GET /events is paginated: the response is { "content": [ ...events... ], "page": {...} }.
+# Pipe `.content` to see just the matches; add ?page/size/sort to control paging (below).
+
+# whole catalog (first page)
+curl -s $BASE/events | jq '.content'
 
 # filter by status
-curl -s "$BASE/events?status=ON_SALE" | jq
+curl -s "$BASE/events?status=ON_SALE" | jq '.content'
 
 # filter by name (case-insensitive substring)
-curl -s "$BASE/events?name=jazz" | jq
+curl -s "$BASE/events?name=jazz" | jq '.content'
 
 # filter by city (matched via the venue join, case-insensitive)
-curl -s "$BASE/events?city=san%20francisco" | jq
+curl -s "$BASE/events?city=san%20francisco" | jq '.content'
 
 # filter by performer (case-insensitive substring)
-curl -s "$BASE/events?performer=phoebe" | jq          # -> the queued Fever Dream Tour
+curl -s "$BASE/events?performer=phoebe" | jq '.content'   # -> the queued Fever Dream Tour
 
 # filter by start-time range (ISO-8601). seed events start ~30 days out, so a today..+60d
 # window includes them, while an upper bound of "now" excludes them (they're in the future):
 FROM=$(date -u +%Y-%m-%dT00:00:00Z)
-TO=$(date -u -v+60d +%Y-%m-%dT00:00:00Z)               # BSD/macOS date syntax
-curl -s "$BASE/events?from=$FROM&to=$TO" | jq          # -> both seed events
-curl -s "$BASE/events?to=$FROM" | jq                   # -> []  (nothing starts before today)
+TO=$(date -u -v+60d +%Y-%m-%dT00:00:00Z)                  # BSD/macOS date syntax
+curl -s "$BASE/events?from=$FROM&to=$TO" | jq '.content'  # -> both seed events
+curl -s "$BASE/events?to=$FROM" | jq '.content'           # -> []  (nothing starts before today)
 
 # filters are ANDed together: on-sale "jazz" events in SF
-curl -s "$BASE/events?status=ON_SALE&city=san%20francisco&name=jazz" | jq
+curl -s "$BASE/events?status=ON_SALE&city=san%20francisco&name=jazz" | jq '.content'
+
+# pagination + sort: one event per page, newest first — shows the page metadata block
+curl -s "$BASE/events?size=1&page=0&sort=startsAt,desc" | jq '{names: [.content[].name], page}'
 
 # a single event, and the venue list
 curl -s $BASE/events/$OPEN | jq
@@ -285,7 +291,7 @@ Then re-run from step 2.
 
 | Method & path | Purpose |
 |---|---|
-| `GET /events?name=&status=&city=&performer=&from=&to=` | Browse / filter events (all optional, ANDed) |
+| `GET /events?name=&status=&city=&performer=&from=&to=&page=&size=&sort=` | Browse / filter events (filters optional + ANDed); paginated response `{content, page}` |
 | `GET /events/{id}` | One event |
 | `GET /events/{id}/tickets` | Tickets for an event |
 | `POST /events` | Create event (needs a venue with seats) |
