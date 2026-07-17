@@ -26,7 +26,7 @@ SELECT id FROM bookings WHERE event_id IN (SELECT id FROM seed_events);
 -- The Booking->Ticket link is the tickets.booking_id FK (Ticket owns it); release any ticket
 -- pointing at a booking we're about to delete before deleting the bookings. (These tickets all
 -- belong to seed events and are deleted just below.)
-UPDATE tickets SET booking_id = NULL, status = 'AVAILABLE', hold_expires_at = NULL
+UPDATE tickets SET booking_id = NULL, status = 'AVAILABLE'
  WHERE booking_id IN (SELECT id FROM seed_bookings);
 DELETE FROM payments WHERE booking_id IN (SELECT id FROM seed_bookings);
 DELETE FROM bookings WHERE id         IN (SELECT id FROM seed_bookings);

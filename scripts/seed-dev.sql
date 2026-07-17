@@ -38,7 +38,7 @@ WHERE event_id IN (SELECT id FROM _seed_events)
 -- that points at a booking we're about to delete -- including legacy-event tickets a seed user
 -- booked, which we keep -- so the FK no longer blocks the booking delete. (seed-event tickets are
 -- deleted outright below anyway.)
-UPDATE tickets SET booking_id = NULL, status = 'AVAILABLE', hold_expires_at = NULL
+UPDATE tickets SET booking_id = NULL, status = 'AVAILABLE'
  WHERE booking_id IN (SELECT id FROM _seed_bookings);
 DELETE FROM payments WHERE booking_id IN (SELECT id FROM _seed_bookings);
 DELETE FROM bookings WHERE id         IN (SELECT id FROM _seed_bookings);
