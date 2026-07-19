@@ -42,6 +42,8 @@ public class BookingService {
     @Autowired
     private UserRepository userRepository;
 
+    @Value("${booking.hold-window-minutes:10}")
+    private int holdWindowMinutes;
     @Value("${booking.max-tickets-per-user:4}")
     private int maxTicketsPerUser;
     private TransactionTemplate transactionTemplate;
@@ -89,7 +91,7 @@ public class BookingService {
             int totalCents = tickets.stream().mapToInt(Ticket::getPriceCents).sum();
 
             // 6. book!
-            ZonedDateTime expiresAt = ZonedDateTime.now().plusMinutes(10);
+            ZonedDateTime expiresAt = ZonedDateTime.now().plusMinutes(holdWindowMinutes);
             Booking booking = new Booking();
             booking.setUser(userRepository.findById(userId)
                                           .orElseThrow(() -> new NoSuchElementException("User not found: " + userId)));
