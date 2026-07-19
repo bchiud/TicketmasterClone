@@ -140,8 +140,17 @@ curl -s $BASE/bookings/$OPEN_BOOKING | jq '{id, status}'
 curl -s $BASE/bookings/$OPEN_BOOKING/payments | jq
 ```
 
-**Idempotency:** re-run the exact same HOLD command (same `idempotencyKey`) — you get the *same*
-booking back, not a second one.
+**Idempotency shows up in two places:**
+
+- **Hold** — re-run the exact same HOLD command (same `idempotencyKey`) and you get the *same*
+  booking back, not a second one.
+- **Pay** — re-run the PAY on an already-confirmed booking and it returns that same booking
+  (still `CONFIRMED`), with **no second charge**:
+
+  ```bash
+  curl -s -XPOST $BASE/bookings/$OPEN_BOOKING/pay | jq '{id, status}'   # CONFIRMED, unchanged
+  curl -s $BASE/bookings/$OPEN_BOOKING/payments | jq 'length'          # -> 1  (not 2)
+  ```
 
 ---
 
