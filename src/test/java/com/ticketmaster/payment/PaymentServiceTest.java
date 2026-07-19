@@ -141,13 +141,29 @@ class PaymentServiceTest {
                 .isInstanceOf(NoSuchElementException.class);
     }
 
+    // paying an already-confirmed booking is idempotent: return it, don't charge again
     @Test
-    void throwsWhenPayingForAnAlreadyConfirmedBooking() {
+    void payingAnAlreadyConfirmedBookingIsIdempotent() {
         User user = saveUser();
         Event event = saveEvent();
         Ticket ticket = saveTicket(event, "1", 150);
         Booking booking = bookingService.hold(user.getId(), event.getId(), List.of(ticket.getId()), "pay-idem-2", null);
         paymentService.pay(booking.getId());
+
+        Booking again = paymentService.pay(booking.getId());
+
+        assertThat(again.getStatus()).isEqualTo(BookingStatus.CONFIRMED);
+        // no second charge: still exactly one SUCCEEDED payment
+        assertThat(paymentRepository.findByBookingId(booking.getId())).hasSize(1);
+    }
+
+    @Test
+    void throwsWhenPayingForACancelledBooking() {
+        User user = saveUser();
+        Event event = saveEvent();
+        Ticket ticket = saveTicket(event, "1", 150);
+        Booking booking = bookingService.hold(user.getId(), event.getId(), List.of(ticket.getId()), "pay-idem-cancel", null);
+        bookingService.cancel(booking.getId()); // status -> CANCELLED
 
         assertThatThrownBy(() -> paymentService.pay(booking.getId()))
                 .isInstanceOf(InvalidBookingStateException.class);

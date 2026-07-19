@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX IF NOT EXISTS uq_payments_one_succeeded_per_booking ON payments (booking_id) WHERE status = 'SUCCEEDED';

@@ -22,12 +22,17 @@ public class PaymentService {
     @Autowired
     private PaymentRepository paymentRepository;
 
-
     @Transactional
     public Booking pay(Long bookingId) {
         Booking booking = bookingRepository.findById(bookingId)
                                            .orElseThrow(() -> new NoSuchElementException(
                                                    "Booking not found: " + bookingId));
+
+        // idempotent: already paid → return the confirmed booking, don't charge again
+        if (booking.getStatus() == BookingStatus.CONFIRMED) return booking;
+
+        if (booking.getStatus() != BookingStatus.PENDING)
+            throw new InvalidBookingStateException("Booking not payable: " + booking.getStatus());
 
         Payment payment = new Payment();
         payment.setBooking(booking);
@@ -42,7 +47,6 @@ public class PaymentService {
 
     @Transactional
     public Booking refund(Long bookingId) {
-
         Booking booking = bookingRepository.findById(bookingId)
                                            .orElseThrow(() -> new NoSuchElementException(
                                                    "Booking not found: " + bookingId));
@@ -63,7 +67,5 @@ public class PaymentService {
 
         booking = bookingService.cancel(bookingId);
         return booking;
-
-
     }
 }
