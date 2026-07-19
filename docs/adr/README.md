@@ -7,6 +7,7 @@
 | [0003](0003-booking-ticket-association.md) | Booking–Ticket Association — FK-based `@OneToMany` | Accepted |
 | [0004](0004-event-search-jpa-specifications.md) | Dynamic Event Search — JPA Specifications | Accepted |
 | [0005](0005-response-dtos-osiv.md) | API Response DTOs & Disabling Open-Session-in-View | Accepted |
+| [0006](0006-payment-idempotency.md) | Payment Idempotency — Booking-Scoped Guard + Partial Unique Index | Accepted |
 
 See [`../design.md`](../design.md) for the overall system design these
 decisions implement.

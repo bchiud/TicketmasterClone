@@ -117,7 +117,7 @@ in Redis.
 | GET    | `/events/{eventId}/tickets`   | List tickets for an event; optional `status` filter    |
 | GET    | `/tickets/{id}`               | Get a ticket by id                                     |
 | POST   | `/bookings/hold`               | Hold tickets (idempotent; may require a queue access token) |
-| POST   | `/bookings/{id}/pay`          | Confirm a held booking with payment                    |
+| POST   | `/bookings/{id}/pay`          | Confirm a held booking with payment (idempotent — a retry on a confirmed booking returns it, no double-charge) |
 | POST   | `/bookings/{id}/cancel`       | Cancel a booking                                       |
 | GET    | `/bookings/{id}`              | Get a booking by id                                    |
 | GET    | `/users/{userId}/bookings`    | List bookings for a user                               |
@@ -132,3 +132,39 @@ Errors are mapped centrally by `ApiExceptionHandler` (`common/`):
 `403` (booking a queue-gated event without a valid access token),
 `404` (unknown id), `409` (state-machine conflicts like paying a cancelled booking, or a concurrent-modification conflict from optimistic/row locking),
 `429` (queue join over the per-IP rate limit).
+
+## Known limitations & next steps
+
+A few things are deliberately scoped out to keep the project focused on its core — the
+concurrency-safe booking path — rather than production-hardened across the board. Each is a
+conscious trade-off, not an oversight:
+
+- **Schedulers assume a single instance.** The three `@Scheduled` sweeps — queue admission
+  (`QueueService.admit`), booking expiry (`BookingService.expire`), and on-sale activation
+  (`EventService.activateOnSaleEvents`) — run on every node, so deploying N replicas would run
+  each sweep N times. It's currently safe-ish, since each has an independent guard:
+  - queue admission pops via atomic Lua `ZPOPMIN`, so instances split the work rather than
+    double-admit;
+  - expiry mutates each booking under its `@Version` optimistic lock, so a concurrent second
+    sweep loses cleanly;
+  - on-sale activation is idempotent (`SCHEDULED → ON_SALE` twice is harmless).
+  - *Next:* a distributed lock (ShedLock's `@SchedulerLock`, backed by the existing Redis) or
+    leader election, so each sweep runs once cluster-wide instead of relying on per-operation
+    guards.
+
+- **No authentication or authorization.** `userId` comes from the request body/path, and by-id
+  endpoints have no ownership checks — any caller can read or mutate any booking. Deliberately
+  omitted so the demo stays on the booking/concurrency core.
+  - *Next:* authenticate at the gateway, derive `userId` from the authenticated principal (not
+    the request), and enforce ownership on every by-id read and mutation.
+
+- **Schema is managed by Hibernate `ddl-auto=update`, not migrations.** Fine for a single-dev
+  project, but it never drops/retypes columns and can't express everything — e.g. the partial
+  unique index on `payments` lives in `schema.sql`, not the entity mapping.
+  - *Next:* Flyway/Liquibase versioned migrations as the single source of schema truth.
+
+- **The payment double-charge backstop surfaces as `500`, by design.** "At most one `SUCCEEDED`
+  payment per booking" is enforced at three layers: the `pay()` idempotency guard, the booking's
+  `@Version` optimistic lock, and a partial unique index. The first two return proper responses;
+  the index is a last-resort DB guarantee. If it ever fires, a path bypassed both app-layer
+  guards — an anomaly worth a `500` + alert, not a routine `409`.

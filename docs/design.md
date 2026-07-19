@@ -176,11 +176,15 @@ Redis is the fast gatekeeper; the DB is still written asynchronously as the dura
 ### 9.4 Confirm & expiry
 
 - **Confirm (after payment):** in one DB transaction, verify the booking is still `PENDING` **and** `expires_at > now()`, then flip tickets → `BOOKED` and booking → `CONFIRMED`. If the hold already expired, refund/abort — never confirm a stale hold.
+- **Mark sold out:** after a confirm, the event flips to `SOLD_OUT` once no ticket remains that could still be sold or is mid-sale — i.e. no `AVAILABLE` **and** no `HELD` tickets (`BOOKED` and `CANCELLED` are both terminal). Checking "nothing sellable left" rather than "all BOOKED" keeps voided (`CANCELLED`) seats from blocking sold-out, and is a single `COUNT` query rather than a full ticket scan.
 - **Expiry sweep:** Redis TTL handles the in-memory locks automatically. For the DB, run a periodic job (or lazy check on read) that finds `PENDING` bookings whose `expires_at < now()` and, one transaction per booking, flips the booking → `EXPIRED` and its tickets back to `AVAILABLE`. The hold window lives on the **booking** (`bookings.expires_at`), so the sweep is booking-level — tickets carry no per-ticket expiry column. Belt-and-suspenders: always re-check `expires_at` at confirm time so a slow sweeper can't cause a double-sell.
 
 ### 9.5 Idempotency
 
-Payment webhooks and client retries can fire twice. Give each booking attempt an **idempotency key**; a duplicate confirm returns the original result instead of charging or booking twice.
+Client retries and payment webhooks can fire twice, at two points:
+
+- **Hold:** each booking attempt carries an **idempotency key** (`bookings.idempotency_key UNIQUE`); a duplicate hold returns the original booking instead of creating a second.
+- **Pay:** a booking is paid **at most once**. `pay()` short-circuits — if the booking is already `CONFIRMED` it returns it unchanged (no second charge), and rejects non-payable states up front (never charge, then roll back). The invariant is backstopped in the DB by a **partial unique index** (`one SUCCEEDED payment per booking`), and a concurrent double-pay is caught by the `@Version` lock (§9.6). So a retried `pay` is idempotent — it returns the confirmed booking rather than double-charging or erroring. (A client-supplied idempotency key on the payment is the more general alternative; scoping to the booking is simpler and fits "a booking is paid once.")
 
 ### 9.6 Guarding booking-state transitions (optimistic locking)
 
@@ -263,6 +267,11 @@ CREATE TABLE payments (
     status          TEXT,                      -- PENDING / SUCCEEDED / FAILED / REFUNDED
     created_at      TIMESTAMPTZ DEFAULT now()
 );
+
+-- at most one SUCCEEDED payment per booking (don't double-charge); partial so a booking can
+-- still carry FAILED/REFUNDED rows alongside its SUCCEEDED one -- see §9.5
+CREATE UNIQUE INDEX uq_payments_one_succeeded_per_booking
+    ON payments (booking_id) WHERE status = 'SUCCEEDED';
 ```
 
 **Notes**
@@ -270,6 +279,7 @@ CREATE TABLE payments (
 - **Shard by `event_id`.** Contention is per-event, so events scale independently and a hot event's load stays isolated.
 - A booking's tickets are linked by the **`tickets.booking_id`** foreign key (on the many side), not an array column on `bookings`. This makes the FK the single source of truth and enforces "a ticket belongs to at most one booking" at the DB layer — see [ADR-0003](adr/0003-booking-ticket-association.md). (In the DDL above, `tickets.booking_id REFERENCES bookings(id)` is a forward reference; in practice the constraint is added once both tables exist.)
 - **`bookings.version`** is the optimistic-lock counter (JPA `@Version`). Lifecycle transitions (`pay`/`cancel`/`confirm`) update `... WHERE id = ? AND version = ?`, so a concurrent transition is rejected instead of silently overwriting — see §9.6. (Adding a `NOT NULL` column to an already-populated table needs a backfill migration; `ddl-auto=update` can't do it, which is one reason a real deploy uses Flyway/Liquibase rather than Hibernate DDL.)
+- The **partial unique index** on `payments` enforces "at most one `SUCCEEDED` payment per booking" at the DB layer (see §9.5). It's *partial* (`WHERE status = 'SUCCEEDED'`) so a booking can still hold `FAILED`/`REFUNDED` rows — a plain `UNIQUE(booking_id)` would forbid those. Hibernate's `@Index` can't express a `WHERE` predicate, so this lives in `schema.sql` (and would be a Flyway migration in production).
 
 ## 11. Waiting-Queue Design (the on-sale spike)
 
