@@ -24,7 +24,7 @@ public class PaymentService {
 
     @Transactional
     public Booking pay(Long bookingId) {
-        Booking booking = bookingRepository.findById(bookingId)
+        Booking booking = bookingRepository.findWithTicketsById(bookingId)
                                            .orElseThrow(() -> new NoSuchElementException(
                                                    "Booking not found: " + bookingId));
 
