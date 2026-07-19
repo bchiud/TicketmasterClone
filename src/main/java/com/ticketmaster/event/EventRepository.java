@@ -16,6 +16,5 @@ public interface EventRepository extends JpaRepository<Event, Long>, JpaSpecific
 
     List<Event> findByNameContainingIgnoreCaseAndStatus(String name, EventStatus status);
 
-    List<Event> findByStatusAndOnSaleAtBefore(EventStatus status,
-                                              ZonedDateTime cutoff);
+    List<Event> findByStatusAndOnSaleAtBefore(EventStatus status, ZonedDateTime cutoff);
 }

@@ -33,7 +33,8 @@ public class EventController {
                                             @RequestParam(required = false) ZonedDateTime from,
                                             @RequestParam(required = false) ZonedDateTime to,
                                             @PageableDefault(size = 20, sort = "startsAt") Pageable pageable) {
-        return eventRepository.findAll(EventSpecifications.matching(name, status, city, performer, from, to), pageable).map(EventResponse::from);
+        return eventRepository.findAll(EventSpecifications.matching(name, status, city, performer, from, to), pageable)
+                              .map(EventResponse::from);
     }
 
     @GetMapping("/{id}")

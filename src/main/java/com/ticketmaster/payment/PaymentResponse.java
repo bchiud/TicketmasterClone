@@ -6,8 +6,7 @@ public record PaymentResponse(Long id, Long bookingId, Integer amountCents, Paym
                               ZonedDateTime createdAt) {
     public static PaymentResponse from(Payment p) {
         return new PaymentResponse(p.getId(),
-                                   p.getBooking()
-                                    .getId(),
+                                   p.getBooking().getId(),
                                    p.getAmountCents(),
                                    p.getStatus(),
                                    p.getCreatedAt());

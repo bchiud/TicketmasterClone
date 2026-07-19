@@ -20,9 +20,8 @@ public class EventSpecifications {
             if (name != null && !name.isBlank())
                 predicates.add(cb.like(cb.lower(root.get("name")), "%" + name.toLowerCase() + "%"));
 
-            if (city != null && !city.isBlank()) predicates.add(cb.equal(cb.lower(root.join("venue")
-                                                                                      .get("city")),
-                                                                         city.toLowerCase()));
+            if (city != null && !city.isBlank())
+                predicates.add(cb.equal(cb.lower(root.join("venue").get("city")), city.toLowerCase()));
 
             if (status != null) predicates.add(cb.equal(root.get("status"), status));
 

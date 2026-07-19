@@ -26,8 +26,8 @@ public class PaymentService {
     @Transactional
     public Booking pay(Long bookingId) {
         Booking booking = bookingRepository.findById(bookingId)
-                                           .orElseThrow(
-                                                   () -> new NoSuchElementException("Booking not found: " + bookingId));
+                                           .orElseThrow(() -> new NoSuchElementException(
+                                                   "Booking not found: " + bookingId));
 
         Payment payment = new Payment();
         payment.setBooking(booking);
@@ -44,16 +44,14 @@ public class PaymentService {
     public Booking refund(Long bookingId) {
 
         Booking booking = bookingRepository.findById(bookingId)
-                                           .orElseThrow(
-                                                   () -> new NoSuchElementException("Booking not found: " + bookingId));
-        if (!booking.getStatus()
-                    .equals(BookingStatus.CONFIRMED))
+                                           .orElseThrow(() -> new NoSuchElementException(
+                                                   "Booking not found: " + bookingId));
+        if (!booking.getStatus().equals(BookingStatus.CONFIRMED))
             throw new InvalidBookingStateException("Booking not confirmed: " + bookingId);
 
         List<Payment> payments = paymentRepository.findByBookingId(bookingId);
         for (Payment payment : payments) {
-            if (payment.getStatus()
-                       .equals(PaymentStatus.SUCCEEDED)) {
+            if (payment.getStatus().equals(PaymentStatus.SUCCEEDED)) {
                 Payment refund = new Payment();
                 refund.setBooking(booking);
                 refund.setProviderRef("fake-" + UUID.randomUUID());

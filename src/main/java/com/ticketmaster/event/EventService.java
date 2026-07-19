@@ -70,8 +70,8 @@ public class EventService {
     }
 
     public void markSoldOutIfLastTicketBooked(Event event) {
-        if (ticketRepository.countByEventIdAndStatusesIn(event.getId(),
-                                                         List.of(TicketStatus.AVAILABLE, TicketStatus.HELD)) == 0) {
+        if (ticketRepository.countByEventIdAndStatusIn(event.getId(),
+                                                       List.of(TicketStatus.AVAILABLE, TicketStatus.HELD)) == 0) {
             event.setStatus(EventStatus.SOLD_OUT);
             eventRepository.save(event);
         }

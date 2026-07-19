@@ -51,16 +51,13 @@ public class QueueService {
         eventService.getEventIfOnSale(eventId);
 
         String eventKey = getEventKey(eventId);
-        String token = UUID.randomUUID()
-                           .toString();
+        String token = UUID.randomUUID().toString();
 
-        Long queueSize = stringRedisTemplate.opsForZSet()
-                                            .zCard(eventKey);
+        Long queueSize = stringRedisTemplate.opsForZSet().zCard(eventKey);
         // escape hatch for empty queue
         if (queueSize == null || queueSize == 0) {
             String eventAdmittedCountKey = getEventAdmittedCountKey(eventKey);
-            Long admittedCount = stringRedisTemplate.opsForValue()
-                                                    .increment(eventAdmittedCountKey);
+            Long admittedCount = stringRedisTemplate.opsForValue().increment(eventAdmittedCountKey);
             // window self-clears every admitIntervalMs so the escape hatch reopens once traffic calms down
             if (admittedCount == 1)
                 stringRedisTemplate.expire(eventAdmittedCountKey, Duration.ofMillis(admitIntervalMs));
@@ -81,14 +78,12 @@ public class QueueService {
     }
 
     public Long getPosition(Long eventId, String token) {
-        return stringRedisTemplate.opsForZSet()
-                                  .rank(getEventKey(eventId), token);
+        return stringRedisTemplate.opsForZSet().rank(getEventKey(eventId), token);
     }
 
     @Scheduled(fixedDelayString = "${queue.admit-interval-ms:1000}")
     public void admit() {
-        Set<String> activeEvents = stringRedisTemplate.opsForSet()
-                                                      .members(ACTIVE_EVENTS_KEY);
+        Set<String> activeEvents = stringRedisTemplate.opsForSet().members(ACTIVE_EVENTS_KEY);
         if (activeEvents == null || activeEvents.isEmpty()) return;
 
         for (String eventId : activeEvents) {
@@ -126,8 +121,7 @@ public class QueueService {
         String eventKey = getEventKey(eventId);
 
         // active event
-        stringRedisTemplate.opsForSet()
-                           .remove(ACTIVE_EVENTS_KEY, String.valueOf(eventId));
+        stringRedisTemplate.opsForSet().remove(ACTIVE_EVENTS_KEY, String.valueOf(eventId));
         // queue sequence
         stringRedisTemplate.delete(getEventQueueSequenceKey(eventKey));
         // admitted count
@@ -137,10 +131,7 @@ public class QueueService {
         // admitted access tokens
         // standard delete will block redis while scanning
         // chunk using cursor so we don't block
-        ScanOptions options = ScanOptions.scanOptions()
-                                         .match(getAccessKeyPrefix(eventId) + "*")
-                                         .count(1000)
-                                         .build();
+        ScanOptions options = ScanOptions.scanOptions().match(getAccessKeyPrefix(eventId) + "*").count(1000).build();
         try (Cursor<String> cursor = stringRedisTemplate.scan(options)) {
             List<String> batch = new ArrayList<>();
             while (cursor.hasNext()) {
@@ -159,8 +150,7 @@ public class QueueService {
     }
 
     private void grantAccess(Long eventId, String token) {
-        stringRedisTemplate.opsForValue()
-                           .set(getAccessKey(eventId, token), "1", Duration.ofMinutes(10));
+        stringRedisTemplate.opsForValue().set(getAccessKey(eventId, token), "1", Duration.ofMinutes(10));
     }
 
     private String getAccessKeyPrefix(Long eventId) {

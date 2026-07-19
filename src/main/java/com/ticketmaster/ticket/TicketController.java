@@ -26,13 +26,8 @@ public class TicketController {
     @GetMapping("/events/{eventId}/tickets")
     public List<TicketResponse> getTicketsForEvent(@PathVariable Long eventId,
                                                    @RequestParam(required = false) TicketStatus status) {
-        if (status != null) return ticketRepository.findByEventIdAndStatus(eventId, status)
-                                                   .stream()
-                                                   .map(TicketResponse::from)
-                                                   .toList();
-        return ticketRepository.findByEventId(eventId)
-                               .stream()
-                               .map(TicketResponse::from)
-                               .toList();
+        if (status != null)
+            return ticketRepository.findByEventIdAndStatus(eventId, status).stream().map(TicketResponse::from).toList();
+        return ticketRepository.findByEventId(eventId).stream().map(TicketResponse::from).toList();
     }
 }

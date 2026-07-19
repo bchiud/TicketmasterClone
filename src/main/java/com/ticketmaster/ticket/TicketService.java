@@ -25,11 +25,9 @@ public class TicketService {
     }
 
     public List<Ticket> generateForEvent(Event event, int priceCents) {
-        List<Seat> seats = seatRepository.findByVenueId(event.getVenue()
-                                                             .getId());
+        List<Seat> seats = seatRepository.findByVenueId(event.getVenue().getId());
         if (seats == null || seats.isEmpty())
-            throw new VenueHasNoSeatsException("Venue has no seats: " + event.getVenue()
-                                                                             .getId());
+            throw new VenueHasNoSeatsException("Venue has no seats: " + event.getVenue().getId());
 
         List<Ticket> tickets = new ArrayList<>();
         for (Seat seat : seats) {

@@ -28,10 +28,7 @@ public class PaymentController {
 
     @GetMapping("/bookings/{id}/payments")
     public List<PaymentResponse> getPaymentsByBookingId(@PathVariable Long id) {
-        return paymentRepository.findByBookingId(id)
-                                .stream()
-                                .map(PaymentResponse::from)
-                                .toList();
+        return paymentRepository.findByBookingId(id).stream().map(PaymentResponse::from).toList();
     }
 
     @PostMapping("/bookings/{id}/refund")

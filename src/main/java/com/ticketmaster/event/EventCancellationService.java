@@ -36,8 +36,7 @@ public class EventCancellationService {
     @Transactional
     public Event cancelEvent(Long eventId) {
         Event event = eventRepository.findById(eventId)
-                                     .orElseThrow(() -> new NoSuchElementException("Event not "
-                                                                                   + "found: " + eventId));
+                                     .orElseThrow(() -> new NoSuchElementException("Event not " + "found: " + eventId));
 
         if (event.getStatus() == EventStatus.CANCELLED)
             throw new EventAlreadyCancelledException("Event already cancelled");
@@ -45,14 +44,12 @@ public class EventCancellationService {
         event.setStatus(EventStatus.CANCELLED);
         eventRepository.save(event);
 
-        List<Booking> bookings = bookingRepository.findByEventIdAndStatusIn(
-                eventId, List.of(BookingStatus.PENDING,
-                                 BookingStatus.CONFIRMED));
+        List<Booking> bookings = bookingRepository.findByEventIdAndStatusIn(eventId,
+                                                                            List.of(BookingStatus.PENDING,
+                                                                                    BookingStatus.CONFIRMED));
         for (Booking booking : bookings) {
-            if (booking.getStatus() == BookingStatus.CONFIRMED)
-                paymentService.refund(booking.getId());
-            else
-                bookingService.cancel(booking.getId());
+            if (booking.getStatus() == BookingStatus.CONFIRMED) paymentService.refund(booking.getId());
+            else bookingService.cancel(booking.getId());
         }
 
         ticketService.cancelTicketsbyEventId(eventId);

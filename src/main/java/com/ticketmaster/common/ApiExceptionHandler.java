@@ -22,26 +22,22 @@ import java.util.stream.Collectors;
 public class ApiExceptionHandler {
     @ExceptionHandler(ConcurrencyFailureException.class)
     public ResponseEntity<?> handleConcurrencyFailureException(ConcurrencyFailureException ex) {
-        return ResponseEntity.status(HttpStatus.CONFLICT)
-                             .body("Resource was modified concurrently, please retry");
+        return ResponseEntity.status(HttpStatus.CONFLICT).body("Resource was modified concurrently, please retry");
     }
 
     @ExceptionHandler(EventAlreadyCancelledException.class)
     public ResponseEntity<?> handleEventAlreadyCancelledException(EventAlreadyCancelledException ex) {
-        return ResponseEntity.status(HttpStatus.CONFLICT)
-                             .body(ex.getMessage());
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(ex.getMessage());
     }
 
     @ExceptionHandler(EventNotOnSaleException.class)
     public ResponseEntity<?> handleEventNotOnSaleException(EventNotOnSaleException ex) {
-        return ResponseEntity.status(HttpStatus.CONFLICT)
-                             .body(ex.getMessage());
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(ex.getMessage());
     }
 
     @ExceptionHandler(InvalidBookingStateException.class)
     public ResponseEntity<String> handleInvalidBookingState(InvalidBookingStateException ex) {
-        return ResponseEntity.status(HttpStatus.CONFLICT)
-                             .body(ex.getMessage());
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(ex.getMessage());
     }
 
     // request body validation exception
@@ -52,43 +48,36 @@ public class ApiExceptionHandler {
                            .stream()
                            .map(err -> err.getField() + " " + err.getDefaultMessage())
                            .collect(Collectors.joining(", "));
-        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                             .body(message);
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(message);
     }
 
     @ExceptionHandler(NoSuchElementException.class)
     public ResponseEntity<String> handleNotFound(NoSuchElementException ex) {
-        return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                             .body(ex.getMessage());
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(ex.getMessage());
     }
 
     @ExceptionHandler(QueueAccessRequiredException.class)
     public ResponseEntity<String> handleQueueAccessRequired(QueueAccessRequiredException ex) {
-        return ResponseEntity.status(HttpStatus.FORBIDDEN)
-                             .body(ex.getMessage());
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(ex.getMessage());
     }
 
     @ExceptionHandler(RateLimitException.class)
     public ResponseEntity<String> handleRateLimitException(RateLimitException ex) {
-        return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
-                             .body(ex.getMessage());
+        return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS).body(ex.getMessage());
     }
 
     @ExceptionHandler(TicketLimitedExceededException.class)
     public ResponseEntity<String> handleTicketLimitedExceeded(TicketLimitedExceededException ex) {
-        return ResponseEntity.status(HttpStatus.CONFLICT)
-                             .body(ex.getMessage());
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(ex.getMessage());
     }
 
     @ExceptionHandler(TicketUnavailableException.class)
     public ResponseEntity<String> handleTicketUnavailable(TicketUnavailableException ex) {
-        return ResponseEntity.status(HttpStatus.CONFLICT)
-                             .body(ex.getMessage());
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(ex.getMessage());
     }
 
     @ExceptionHandler(VenueHasNoSeatsException.class)
     public ResponseEntity<String> handleVenueHasNoSeatsException(VenueHasNoSeatsException ex) {
-        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                             .body(ex.getMessage());
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(ex.getMessage());
     }
 }
