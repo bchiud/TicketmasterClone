@@ -8,6 +8,9 @@ import java.util.List;
 import java.util.Optional;
 
 public interface BookingRepository extends JpaRepository<Booking, Long> {
+    // @EntityGraph fetches tickets in the same query
+    // without it, mapping runs outside the transaction (OSIV off) and throws LazyInitializationException
+    // even with a session open, per-booking fetching would be n + 1
     @EntityGraph(attributePaths = "tickets")
     Optional<Booking> findWithTicketsById(Long id);
 
