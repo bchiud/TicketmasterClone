@@ -36,43 +36,56 @@ cover attribute filtering directly.
 ## Options Considered
 
 ### Derived query methods (status quo)
-- **For**: Zero query code; method names are type-checked; trivial for one or
-  two filters.
-- **Against**: Does not compose. Every new optional filter multiplies the
-  method count and branch tree (2ⁿ). Already visibly straining at two filters;
-  unmaintainable at six.
+- **For**:
+  - Zero query code.
+  - Method names are type-checked.
+  - Trivial for one or two filters.
+- **Against**:
+  - Does not compose.
+  - Every new optional filter multiplies the method count and branch tree (2ⁿ).
+  - Already visibly straining at two filters; unmaintainable at six.
 
 ### Single dynamic `@Query` with null-guards
 A JPQL query of the form `WHERE (:name IS NULL OR lower(e.name) LIKE ...) AND (:status IS NULL OR e.status = :status) AND ...`.
-- **For**: One method, one place; no new dependency.
-- **Against**: The JPQL grows long and repetitive; the join for `city` and the
-  `lower(...)` wrapping make it verbose; the all-null case is awkward; field
-  references are strings in JPQL (no compile-time checking); extending it means
-  editing one increasingly gnarly query.
+- **For**:
+  - One method, one place.
+  - No new dependency.
+- **Against**:
+  - The JPQL grows long and repetitive.
+  - The join for `city` and the `lower(...)` wrapping make it verbose.
+  - The all-null case is awkward.
+  - Field references are strings in JPQL (no compile-time checking).
+  - Extending it means editing one increasingly gnarly query.
 
 ### JPA Specifications (Criteria API) — chosen
 `EventRepository extends JpaSpecificationExecutor<Event>`, plus an
 `EventSpecifications.matching(...)` builder that appends one `Predicate` per
 non-null parameter and ANDs them.
-- **For**: Built into Spring Data JPA — **no new dependency**. Each optional
-  filter is an independently composed predicate added only when its param is
-  present, so there is no branch explosion. AND-composition is natural
-  (`cb.and(predicates)`); an empty predicate list is a no-op that returns all
-  events, replacing the old `findAll()` branch for free. Handles the
-  `Event → Venue` join (`root.join("venue").get("city")`) and the `startsAt`
-  range predicates cleanly. Composes directly with `Pageable`/`Sort`, which
-  sets up pagination as a later step.
-- **Against**: The Criteria API is verbose and lambda-heavy, and entity field
-  names are **string literals** (`"name"`, `"venue"`, `"startsAt"`) that are
-  *not* compile-checked — a typo is a runtime error, not a build error, unless
-  the JPA static metamodel is added.
+- **For**:
+  - Built into Spring Data JPA — **no new dependency**.
+  - Each optional filter is an independently composed predicate added only when
+    its param is present, so there is no branch explosion.
+  - AND-composition is natural (`cb.and(predicates)`); an empty predicate list is
+    a no-op that returns all events, replacing the old `findAll()` branch for
+    free.
+  - Handles the `Event → Venue` join (`root.join("venue").get("city")`) and the
+    `startsAt` range predicates cleanly.
+  - Composes directly with `Pageable`/`Sort`, which sets up pagination as a later
+    step.
+- **Against**:
+  - The Criteria API is verbose and lambda-heavy.
+  - Entity field names are **string literals** (`"name"`, `"venue"`,
+    `"startsAt"`) that are *not* compile-checked — a typo is a runtime error, not
+    a build error, unless the JPA static metamodel is added.
 
 ### Querydsl
-- **For**: Fluent and fully type-safe via generated `Q`-classes; composes
-  predicates well.
-- **Against**: Adds a dependency plus an annotation-processing/codegen build
-  step. Overkill for six filters on a single entity in a learning project, and
-  another tool to learn for a marginal gain over Specifications here.
+- **For**:
+  - Fluent and fully type-safe via generated `Q`-classes.
+  - Composes predicates well.
+- **Against**:
+  - Adds a dependency plus an annotation-processing/codegen build step.
+  - Overkill for six filters on a single entity in a learning project, and
+    another tool to learn for a marginal gain over Specifications here.
 
 ## Decision
 Use **JPA Specifications**. `EventRepository` mixes in

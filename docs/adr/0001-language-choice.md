@@ -27,64 +27,82 @@ That write path is the crux of the language decision. It needs:
 ## Options Considered
 
 ### Java (Spring Boot)
-- **For**: Best-in-class JPA/Hibernate + `@Transactional` support maps
-  directly onto the row-locking pattern in design.md §9.2. Mature JDBC
-  connection pooling (HikariCP), first-class Postgres/Redis/Elasticsearch
-  clients. Strong static typing catches a large class of bugs at compile
-  time, which matters when the core requirement is "never double-sell a
-  seat." Huge ecosystem and hiring pool for this exact workload (transactional
-  e-commerce/booking backends). Spring Boot's opinionated structure
-  (`@Entity`/`@Repository`/`@Service`/`@RestController`) is a good fit for
-  learning idiomatic layered architecture.
-- **Against**: More boilerplate than newer languages/frameworks. JVM startup
-  time and memory footprint are heavier than Go for something like a small
-  Redis-hold worker. Verbose compared to Kotlin/TypeScript for the same
-  logic.
+- **For**:
+  - Best-in-class JPA/Hibernate + `@Transactional` support maps directly onto
+    the row-locking pattern in design.md §9.2.
+  - Mature JDBC connection pooling (HikariCP), first-class
+    Postgres/Redis/Elasticsearch clients.
+  - Strong static typing catches a large class of bugs at compile time, which
+    matters when the core requirement is "never double-sell a seat."
+  - Huge ecosystem and hiring pool for this exact workload (transactional
+    e-commerce/booking backends).
+  - Spring Boot's opinionated structure
+    (`@Entity`/`@Repository`/`@Service`/`@RestController`) is a good fit for
+    learning idiomatic layered architecture.
+- **Against**:
+  - More boilerplate than newer languages/frameworks.
+  - JVM startup time and memory footprint are heavier than Go for something like
+    a small Redis-hold worker.
+  - Verbose compared to Kotlin/TypeScript for the same logic.
 
 ### Go
-- **For**: Excellent concurrency primitives (goroutines/channels) map well
-  onto the hold-worker/queue pieces of the design. Fast startup, low memory
-  footprint, single static binary — good for the horizontally-scaled
-  stateless services in §3. Simpler language surface.
-- **Against**: Weaker ORM story (most teams hand-roll SQL or use a thin query
-  builder), which raises the risk of getting the locking transaction subtly
-  wrong. Smaller ecosystem for the "boring but necessary" plumbing (JPA-style
-  entity mapping, migrations, validation). Less relevant to the author's
-  immediate learning goal.
+- **For**:
+  - Excellent concurrency primitives (goroutines/channels) map well onto the
+    hold-worker/queue pieces of the design.
+  - Fast startup, low memory footprint, single static binary — good for the
+    horizontally-scaled stateless services in §3.
+  - Simpler language surface.
+- **Against**:
+  - Weaker ORM story (most teams hand-roll SQL or use a thin query builder),
+    which raises the risk of getting the locking transaction subtly wrong.
+  - Smaller ecosystem for the "boring but necessary" plumbing (JPA-style entity
+    mapping, migrations, validation).
+  - Less relevant to the author's immediate learning goal.
 
 ### Node.js / TypeScript
-- **For**: Fast to prototype, one language across a future frontend and
-  backend, large package ecosystem, good async I/O for the read-heavy browse
-  path.
-- **Against**: Single-threaded event loop means CPU-bound work and
-  long-held DB transactions can block the process; the write path here is
-  exactly the kind of contended, transaction-heavy workload where this is a
-  liability. Weaker type-level guarantees than Java unless disciplined about
-  strict TypeScript. Transactional ORMs (Prisma/TypeORM) are less battle-tested
-  for pessimistic locking than JPA/Hibernate.
+- **For**:
+  - Fast to prototype.
+  - One language across a future frontend and backend.
+  - Large package ecosystem.
+  - Good async I/O for the read-heavy browse path.
+- **Against**:
+  - Single-threaded event loop means CPU-bound work and long-held DB
+    transactions can block the process; the write path here is exactly the kind
+    of contended, transaction-heavy workload where this is a liability.
+  - Weaker type-level guarantees than Java unless disciplined about strict
+    TypeScript.
+  - Transactional ORMs (Prisma/TypeORM) are less battle-tested for pessimistic
+    locking than JPA/Hibernate.
 
 ### Python
-- **For**: Very fast to write, Django/FastAPI + SQLAlchemy are productive,
-  huge ecosystem, easy to learn.
-- **Against**: GIL limits true parallelism for CPU-bound work within a
-  process (mitigated by process-based scaling, but adds ops complexity).
-  Dynamic typing raises the risk of runtime bugs in the money/seat-locking
-  code path, which is the one place in this system where correctness bugs
-  are most costly. Generally weaker raw throughput per instance than
-  JVM/Go for a service that will be horizontally scaled anyway.
+- **For**:
+  - Very fast to write.
+  - Django/FastAPI + SQLAlchemy are productive.
+  - Huge ecosystem.
+  - Easy to learn.
+- **Against**:
+  - GIL limits true parallelism for CPU-bound work within a process (mitigated
+    by process-based scaling, but adds ops complexity).
+  - Dynamic typing raises the risk of runtime bugs in the money/seat-locking
+    code path, which is the one place in this system where correctness bugs are
+    most costly.
+  - Generally weaker raw throughput per instance than JVM/Go for a service that
+    will be horizontally scaled anyway.
 
 ### Kotlin (JVM)
-- **For**: Runs on the same JVM/Spring ecosystem as Java — same libraries,
-  same transactional guarantees — with less boilerplate and null-safety
-  built into the type system. Because it shares the JVM/Spring runtime,
-  switching to it later would be low-risk if the project's goal ever shifted
-  from "learn Spring Boot" to "build this as concisely as possible."
-- **Against**: Smaller community/resource pool than plain Java for a
-  learning project; most Spring Boot tutorials, Stack Overflow answers, and
-  interview-relevant material default to Java, which matters given the
-  explicit learning goal here. For the *current* goal, Java's larger body of
-  mainstream Spring Boot documentation outweighs Kotlin's conciseness/
-  null-safety advantages.
+- **For**:
+  - Runs on the same JVM/Spring ecosystem as Java — same libraries, same
+    transactional guarantees — with less boilerplate and null-safety built into
+    the type system.
+  - Because it shares the JVM/Spring runtime, switching to it later would be
+    low-risk if the project's goal ever shifted from "learn Spring Boot" to
+    "build this as concisely as possible."
+- **Against**:
+  - Smaller community/resource pool than plain Java for a learning project; most
+    Spring Boot tutorials, Stack Overflow answers, and interview-relevant
+    material default to Java, which matters given the explicit learning goal here.
+  - For the *current* goal, Java's larger body of mainstream Spring Boot
+    documentation outweighs Kotlin's conciseness/null-safety advantages.
 
 ## Decision
 Use **Java with Spring Boot** for the application, backed by Postgres (JPA/
