@@ -51,7 +51,7 @@ public class BookingService {
         transactionTemplate = new TransactionTemplate(transactionManager);
     }
 
-    // pessimistic locking
+    // shared pool (seats) -> pessimistic locking
     @Transactional
     public Booking hold(Long userId, Long eventId, List<Long> ticketIds, String idempotencyKey, String accessToken) {
         // 1. ensure event is onsale
@@ -77,6 +77,7 @@ public class BookingService {
         return existingBooking.orElseGet(() -> {
 
             // 4. lock ticket rows on read
+            // TicketRepository.findByIdIn is annotated with @Lock(LockModeType.PESSIMISTIC_WRITE)
             List<Ticket> tickets = ticketRepository.findByIdIn(ticketIds);
             if (tickets.size() != ticketIds.size()) throw new TicketUnavailableException();
 
@@ -111,7 +112,7 @@ public class BookingService {
         });
     }
 
-    // optimistic locking for confirm / pay / cancel
+    // single owned aggregate (booking) -> optimistic locking for confirm / pay / cancel flow
     @Transactional
     public Booking confirm(long bookingId) {
         Booking booking = bookingRepository.findById(bookingId)
