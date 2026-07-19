@@ -173,6 +173,18 @@ return 'OK'
 
 Redis is the fast gatekeeper; the DB is still written asynchronously as the durable record. If Redis says OK, persist the hold to the DB; if the DB write fails, release the Redis keys.
 
+> **Implemented: Option A (§9.2)** — a pessimistic `SELECT … FOR UPDATE NOWAIT` on the ticket rows
+> (`TicketRepository.findByIdIn`, `@Lock(PESSIMISTIC_WRITE)`) in `BookingService.hold()`. Redis is
+> used only for the queue and admission tokens (§11), not seat holds.
+>
+> **Option B (§9.3, Redis seat holds) is deferred, not replaced by §11** — they attack a hot event
+> at different layers:
+> - **§9.3 makes each hold *faster*** — in-memory `SETNX`, no DB row lock.
+> - **§11 reduces the *number* of concurrent holds** — admission throttling, upstream of the hold.
+>
+> They're orthogonal. Here §11 thins the load enough that the §9.2 lock isn't a bottleneck, so §9.3
+> isn't needed yet — it's the next step if one event ever outgrows the DB lock behind the queue.
+
 ### 9.4 Confirm & expiry
 
 - **Confirm (after payment):** in one DB transaction, verify the booking is still `PENDING` **and** `expires_at > now()`, then flip tickets → `BOOKED` and booking → `CONFIRMED`. If the hold already expired, refund/abort — never confirm a stale hold.
