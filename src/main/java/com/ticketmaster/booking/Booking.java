@@ -43,4 +43,7 @@ public class Booking {
 
     @CreationTimestamp
     private Instant createdAt;
+
+    @Version
+    private Long version;
 }

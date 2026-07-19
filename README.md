@@ -130,5 +130,5 @@ in Redis.
 Errors are mapped centrally by `ApiExceptionHandler` (`common/`):
 `400` (invalid request body, or creating an event against a seatless venue),
 `403` (booking a queue-gated event without a valid access token),
-`404` (unknown id), `409` (state-machine conflicts, e.g. paying a cancelled booking),
+`404` (unknown id), `409` (state-machine conflicts like paying a cancelled booking, or a concurrent-modification conflict from optimistic/row locking),
 `429` (queue join over the per-IP rate limit).

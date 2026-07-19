@@ -45,6 +45,7 @@ public class BookingService {
         transactionTemplate = new TransactionTemplate(transactionManager);
     }
 
+    // pessimistic locking
     @Transactional
     public Booking hold(Long userId, Long eventId, List<Long> ticketIds, String idempotencyKey, String accessToken) {
         // 1. ensure event is onsale
@@ -108,6 +109,7 @@ public class BookingService {
         });
     }
 
+    // optimistic locking for confirm / pay / cancel
     @Transactional
     public Booking confirm(long bookingId) {
         Booking booking = bookingRepository.findById(bookingId)

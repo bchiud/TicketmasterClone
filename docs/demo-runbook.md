@@ -321,5 +321,5 @@ Then re-run from step 2.
 |---|---|
 | `403` | Booking a queue-gated event without a valid access token |
 | `429` | More than `queue.enqueue-limit` joins per window from one IP |
-| `409` | State-machine violations (e.g. paying a cancelled booking) |
+| `409` | State-machine violations (e.g. paying a cancelled booking), or a concurrent-modification conflict (optimistic/row-lock loser) |
 | `400` | Bad request body, or creating an event against a seatless venue |

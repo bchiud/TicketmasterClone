@@ -113,7 +113,7 @@ AVAILABLE ──hold()──▶ HELD ──confirm()──▶ BOOKED
     └──── expire() ────┘   (TTL elapsed or user cancelled)
 ```
 
-Only two transitions can lose a race — `hold()` (two buyers grab the same seat) and `confirm()` (paying against an already-expired hold). Both must be atomic.
+Races come in two shapes, and each gets a different lock. **Contention for the shared seat pool** — two buyers `hold()` the same seat — is handled *pessimistically* with row locks (§9.2). **Concurrent transitions on one already-owned booking** — `pay()` racing `cancel()`, or confirming an already-expired hold — are handled *optimistically* with a `version` column (§9.6). Both must be atomic.
 
 ### 9.2 Option A — DB transaction with row locking (source of truth)
 
@@ -182,6 +182,14 @@ Redis is the fast gatekeeper; the DB is still written asynchronously as the dura
 
 Payment webhooks and client retries can fire twice. Give each booking attempt an **idempotency key**; a duplicate confirm returns the original result instead of charging or booking twice.
 
+### 9.6 Guarding booking-state transitions (optimistic locking)
+
+`hold()` fights over a shared pool of seats, so it locks pessimistically (§9.2). But once a booking exists, `pay()`, `cancel()`, and `confirm()` each mutate a **single booking the caller already owns** — there's no pool to contend for, only the risk that two of them fire at once (e.g. a user cancels while a payment webhook confirms). Taking a pessimistic row lock on every lifecycle call would be wasteful; instead the `bookings` row carries a `version` column (JPA `@Version`). Every update is `... WHERE id = ? AND version = ?`: the first writer wins and bumps the version, the second matches **zero rows** and its transaction is rejected and rolled back — including any ticket changes it made in the same transaction.
+
+**Rule of thumb:** pessimistic locking where callers contend for a *shared pool*; optimistic locking where they transition a *single owned aggregate*.
+
+The loser surfaces as a Spring `ObjectOptimisticLockingFailureException` (optimistic) or `CannotAcquireLockException` (the pessimistic `FOR UPDATE NOWAIT` loser). Both are subtypes of `ConcurrencyFailureException`, which `ApiExceptionHandler` maps to **409 Conflict** ("modified concurrently, please retry") rather than a 500.
+
 ## 10. Database Schema
 
 Transactional core in Postgres/MySQL.
@@ -243,6 +251,7 @@ CREATE TABLE bookings (
     total_cents     INT,
     idempotency_key TEXT UNIQUE,
     expires_at      TIMESTAMPTZ,
+    version         BIGINT NOT NULL DEFAULT 0, -- optimistic-lock counter (JPA @Version); see §9.6
     created_at      TIMESTAMPTZ DEFAULT now()
 );
 
@@ -260,6 +269,7 @@ CREATE TABLE payments (
 - Pre-generating one `tickets` row per (seat, event) when an event goes on sale makes the seat map a simple query and gives you a concrete row to lock. For general-admission (no assigned seats), replace individual rows with an atomic **counter** (`available_count`) decremented under a lock or via Redis.
 - **Shard by `event_id`.** Contention is per-event, so events scale independently and a hot event's load stays isolated.
 - A booking's tickets are linked by the **`tickets.booking_id`** foreign key (on the many side), not an array column on `bookings`. This makes the FK the single source of truth and enforces "a ticket belongs to at most one booking" at the DB layer — see [ADR-0003](adr/0003-booking-ticket-association.md). (In the DDL above, `tickets.booking_id REFERENCES bookings(id)` is a forward reference; in practice the constraint is added once both tables exist.)
+- **`bookings.version`** is the optimistic-lock counter (JPA `@Version`). Lifecycle transitions (`pay`/`cancel`/`confirm`) update `... WHERE id = ? AND version = ?`, so a concurrent transition is rejected instead of silently overwriting — see §9.6. (Adding a `NOT NULL` column to an already-populated table needs a backfill migration; `ddl-auto=update` can't do it, which is one reason a real deploy uses Flyway/Liquibase rather than Hibernate DDL.)
 
 ## 11. Waiting-Queue Design (the on-sale spike)
 

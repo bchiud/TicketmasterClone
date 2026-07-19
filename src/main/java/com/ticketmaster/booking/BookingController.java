@@ -20,6 +20,7 @@ public class BookingController {
         this.paymentService = paymentService;
     }
 
+    // returning entity here. ideally return a DTO to not leak fields
     @GetMapping("/bookings/{id}")
     public Booking getBookingById(@PathVariable Long id) {
         return bookingRepository.findById(id)

@@ -8,6 +8,7 @@ import com.ticketmaster.queue.RateLimitException;
 import com.ticketmaster.ticket.TicketLimitedExceededException;
 import com.ticketmaster.ticket.TicketUnavailableException;
 import com.ticketmaster.venue.VenueHasNoSeatsException;
+import org.springframework.dao.ConcurrencyFailureException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -19,6 +20,12 @@ import java.util.stream.Collectors;
 
 @RestControllerAdvice
 public class ApiExceptionHandler {
+    @ExceptionHandler(ConcurrencyFailureException.class)
+    public ResponseEntity<?> handleConcurrencyFailureException(ConcurrencyFailureException ex) {
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                             .body("Resource was modified concurrently, please retry");
+    }
+
     @ExceptionHandler(EventAlreadyCancelledException.class)
     public ResponseEntity<?> handleEventAlreadyCancelledException(EventAlreadyCancelledException ex) {
         return ResponseEntity.status(HttpStatus.CONFLICT)
