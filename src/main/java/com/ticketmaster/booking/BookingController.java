@@ -13,39 +13,42 @@ public class BookingController {
     private BookingService bookingService;
     private PaymentService paymentService;
 
-    public BookingController(BookingRepository bookingRepository, BookingService bookingService,
+    public BookingController(BookingRepository bookingRepository,
+                             BookingService bookingService,
                              PaymentService paymentService) {
         this.bookingRepository = bookingRepository;
         this.bookingService = bookingService;
         this.paymentService = paymentService;
     }
 
-    // returning entity here. ideally return a DTO to not leak fields
     @GetMapping("/bookings/{id}")
-    public Booking getBookingById(@PathVariable Long id) {
-        return bookingRepository.findById(id)
-                                .orElseThrow(() -> new NoSuchElementException("Booking not found: " + id));
+    public BookingResponse getBookingById(@PathVariable Long id) {
+        return BookingResponse.from(bookingRepository.findWithTicketsById(id)
+                                                     .orElseThrow(() -> new NoSuchElementException(
+                                                             "Booking not found: " + id)));
     }
 
     @GetMapping("/users/{userId}/bookings")
-    public List<Booking> getBookingsByUserId(@PathVariable Long userId) {
-        return bookingRepository.findByUserId(userId);
+    public List<BookingResponse> getBookingsByUserId(@PathVariable Long userId) {
+        return bookingRepository.findWithTicketsByUserId(userId).stream().map(BookingResponse::from).toList();
     }
 
     @PostMapping("/bookings/hold")
-    public Booking holdBooking(@Valid @RequestBody BookingHoldRequest bookingHoldRequest) {
-        return bookingService.hold(bookingHoldRequest.getUserId(), bookingHoldRequest.getEventId(),
-                                   bookingHoldRequest.getTicketIds(), bookingHoldRequest.getIdempotencyKey(),
-                                   bookingHoldRequest.getAccessToken());
+    public BookingResponse holdBooking(@Valid @RequestBody BookingHoldRequest bookingHoldRequest) {
+        return BookingResponse.from(bookingService.hold(bookingHoldRequest.getUserId(),
+                                                        bookingHoldRequest.getEventId(),
+                                                        bookingHoldRequest.getTicketIds(),
+                                                        bookingHoldRequest.getIdempotencyKey(),
+                                                        bookingHoldRequest.getAccessToken()));
     }
 
     @PostMapping("/bookings/{id}/pay")
-    public Booking payBooking(@PathVariable Long id) {
-        return paymentService.pay(id);
+    public BookingResponse payBooking(@PathVariable Long id) {
+        return BookingResponse.from(paymentService.pay(id));
     }
 
     @PostMapping("/bookings/{id}/cancel")
-    public Booking cancelBooking(@PathVariable Long id) {
-        return bookingService.cancel(id);
+    public BookingResponse cancelBooking(@PathVariable Long id) {
+        return BookingResponse.from(bookingService.cancel(id));
     }
 }

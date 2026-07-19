@@ -64,7 +64,7 @@ class PaymentRepositoryTest {
         booking.setTotalCents(150);
         booking.setIdempotencyKey(idempotencyKey);
         booking.setExpiresAt(Instant.now()
-                                     .plusSeconds(600));
+                                    .plusSeconds(600));
         return bookingRepository.save(booking);
     }
 
@@ -101,8 +101,8 @@ class PaymentRepositoryTest {
         List<Payment> payments = paymentRepository.findByBookingId(booking.getId());
 
         assertThat(payments).hasSize(2)
-                             .extracting(Payment::getStatus)
-                             .containsExactlyInAnyOrder(PaymentStatus.FAILED, PaymentStatus.SUCCEEDED);
+                            .extracting(Payment::getStatus)
+                            .containsExactlyInAnyOrder(PaymentStatus.FAILED, PaymentStatus.SUCCEEDED);
     }
 
     @Test

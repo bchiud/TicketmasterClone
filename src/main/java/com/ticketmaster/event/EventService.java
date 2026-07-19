@@ -1,5 +1,6 @@
 package com.ticketmaster.event;
 
+import com.ticketmaster.event.exception.EventNotOnSaleException;
 import com.ticketmaster.ticket.TicketRepository;
 import com.ticketmaster.ticket.TicketService;
 import com.ticketmaster.ticket.TicketStatus;

@@ -1,27 +1,31 @@
 package com.ticketmaster.booking;
 
-import tools.jackson.databind.ObjectMapper;
+import com.ticketmaster.booking.exception.InvalidBookingStateException;
+import com.ticketmaster.event.Event;
 import com.ticketmaster.payment.PaymentService;
-import com.ticketmaster.queue.QueueAccessRequiredException;
-import com.ticketmaster.ticket.TicketUnavailableException;
+import com.ticketmaster.queue.exception.QueueAccessRequiredException;
+import com.ticketmaster.seat.Seat;
+import com.ticketmaster.ticket.Ticket;
+import com.ticketmaster.ticket.TicketStatus;
+import com.ticketmaster.ticket.exception.TicketUnavailableException;
+import com.ticketmaster.user.User;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
+import tools.jackson.databind.ObjectMapper;
 
 import java.util.List;
 import java.util.Optional;
 
+import static org.hamcrest.Matchers.containsString;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.hamcrest.Matchers.containsString;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @WebMvcTest(BookingController.class)
 class BookingControllerTest {
@@ -41,21 +45,59 @@ class BookingControllerTest {
     @MockitoBean
     private PaymentService paymentService;
 
+    // BookingResponse.from() dereferences event, user and tickets, so fixtures must populate them.
+    private static Booking sampleBooking(Long id, BookingStatus status) {
+        Event event = new Event();
+        event.setId(2L);
+        User user = new User();
+        user.setId(7L);
+        Booking booking = new Booking();
+        booking.setId(id);
+        booking.setStatus(status);
+        booking.setEvent(event);
+        booking.setUser(user);
+        booking.setTickets(List.of());
+        return booking;
+    }
+
     @Test
     void getBookingReturnsBookingWhenFound() throws Exception {
-        Booking booking = new Booking();
-        booking.setId(1L);
+        Booking booking = sampleBooking(1L, BookingStatus.PENDING);
         booking.setTotalCents(5000);
-        when(bookingRepository.findById(1L)).thenReturn(Optional.of(booking));
+        when(bookingRepository.findWithTicketsById(1L)).thenReturn(Optional.of(booking));
 
         mockMvc.perform(get("/bookings/1"))
                .andExpect(status().isOk())
                .andExpect(jsonPath("$.totalCents").value(5000));
     }
 
+    // A booking WITH tickets used to serialize into an infinite Booking<->Ticket cycle (HTTP 200
+    // then ~500 levels of nested JSON). The DTO has no back-reference, so this must now be clean.
+    @Test
+    void getBookingSerializesTicketsWithoutCycle() throws Exception {
+        Seat seat = new Seat();
+        seat.setId(50L);
+        Ticket ticket = new Ticket();
+        ticket.setId(10L);
+        ticket.setSeat(seat);
+        ticket.setStatus(TicketStatus.HELD);
+        ticket.setPriceCents(5000);
+        Booking booking = sampleBooking(1L, BookingStatus.PENDING);
+        booking.setTickets(List.of(ticket));
+        when(bookingRepository.findWithTicketsById(1L)).thenReturn(Optional.of(booking));
+
+        mockMvc.perform(get("/bookings/1"))
+               .andExpect(status().isOk())
+               .andExpect(jsonPath("$.tickets[0].id").value(10))
+               .andExpect(jsonPath("$.tickets[0].seatId").value(50))
+               .andExpect(jsonPath("$.tickets[0].status").value("HELD"))
+               .andExpect(jsonPath("$.tickets[0].priceCents").value(5000))
+               .andExpect(jsonPath("$.tickets[0].booking").doesNotExist()); // no back-reference
+    }
+
     @Test
     void getBookingReturns404WhenNotFound() throws Exception {
-        when(bookingRepository.findById(99L)).thenReturn(Optional.empty());
+        when(bookingRepository.findWithTicketsById(99L)).thenReturn(Optional.empty());
 
         mockMvc.perform(get("/bookings/99"))
                .andExpect(status().isNotFound());
@@ -63,9 +105,8 @@ class BookingControllerTest {
 
     @Test
     void getBookingsByUserIdReturnsBookings() throws Exception {
-        Booking booking = new Booking();
-        booking.setId(1L);
-        when(bookingRepository.findByUserId(7L)).thenReturn(List.of(booking));
+        Booking booking = sampleBooking(1L, BookingStatus.PENDING);
+        when(bookingRepository.findWithTicketsByUserId(7L)).thenReturn(List.of(booking));
 
         mockMvc.perform(get("/users/7/bookings"))
                .andExpect(status().isOk())
@@ -74,9 +115,7 @@ class BookingControllerTest {
 
     @Test
     void holdBookingReturnsCreatedBooking() throws Exception {
-        Booking booking = new Booking();
-        booking.setId(1L);
-        booking.setStatus(BookingStatus.PENDING);
+        Booking booking = sampleBooking(1L, BookingStatus.PENDING);
         when(bookingService.hold(anyLong(), anyLong(), any(), any(), any())).thenReturn(booking);
 
         BookingHoldRequest request = new BookingHoldRequest();
@@ -87,8 +126,8 @@ class BookingControllerTest {
         request.setAccessToken("token-1");
 
         mockMvc.perform(post("/bookings/hold")
-                       .contentType("application/json")
-                       .content(objectMapper.writeValueAsString(request)))
+                                .contentType("application/json")
+                                .content(objectMapper.writeValueAsString(request)))
                .andExpect(status().isOk())
                .andExpect(jsonPath("$.status").value("PENDING"));
     }
@@ -106,8 +145,8 @@ class BookingControllerTest {
         request.setAccessToken("token-2");
 
         mockMvc.perform(post("/bookings/hold")
-                       .contentType("application/json")
-                       .content(objectMapper.writeValueAsString(request)))
+                                .contentType("application/json")
+                                .content(objectMapper.writeValueAsString(request)))
                .andExpect(status().isConflict());
     }
 
@@ -124,16 +163,16 @@ class BookingControllerTest {
         request.setAccessToken("bogus-token");
 
         mockMvc.perform(post("/bookings/hold")
-                       .contentType("application/json")
-                       .content(objectMapper.writeValueAsString(request)))
+                                .contentType("application/json")
+                                .content(objectMapper.writeValueAsString(request)))
                .andExpect(status().isForbidden());
     }
 
     @Test
     void holdBookingReturns400WhenAllFieldsMissing() throws Exception {
         mockMvc.perform(post("/bookings/hold")
-                       .contentType("application/json")
-                       .content("{}"))
+                                .contentType("application/json")
+                                .content("{}"))
                .andExpect(status().isBadRequest())
                .andExpect(content().string(containsString("userId")))
                .andExpect(content().string(containsString("eventId")))
@@ -151,8 +190,8 @@ class BookingControllerTest {
         request.setAccessToken("token-3");
 
         mockMvc.perform(post("/bookings/hold")
-                       .contentType("application/json")
-                       .content(objectMapper.writeValueAsString(request)))
+                                .contentType("application/json")
+                                .content(objectMapper.writeValueAsString(request)))
                .andExpect(status().isBadRequest())
                .andExpect(content().string(containsString("ticketIds")))
                .andExpect(content().string(org.hamcrest.Matchers.not(containsString("userId"))));
@@ -160,9 +199,7 @@ class BookingControllerTest {
 
     @Test
     void payBookingReturnsConfirmedBooking() throws Exception {
-        Booking booking = new Booking();
-        booking.setId(1L);
-        booking.setStatus(BookingStatus.CONFIRMED);
+        Booking booking = sampleBooking(1L, BookingStatus.CONFIRMED);
         when(paymentService.pay(1L)).thenReturn(booking);
 
         mockMvc.perform(post("/bookings/1/pay"))
@@ -180,7 +217,7 @@ class BookingControllerTest {
 
     @Test
     void payBookingReturns409WhenBookingNotPending() throws Exception {
-        when(paymentService.pay(1L)).thenThrow(new InvalidBookingState("Booking not pending"));
+        when(paymentService.pay(1L)).thenThrow(new InvalidBookingStateException("Booking not pending"));
 
         mockMvc.perform(post("/bookings/1/pay"))
                .andExpect(status().isConflict());
@@ -188,9 +225,7 @@ class BookingControllerTest {
 
     @Test
     void cancelBookingReturnsCancelledBooking() throws Exception {
-        Booking booking = new Booking();
-        booking.setId(1L);
-        booking.setStatus(BookingStatus.CANCELLED);
+        Booking booking = sampleBooking(1L, BookingStatus.CANCELLED);
         when(bookingService.cancel(1L)).thenReturn(booking);
 
         mockMvc.perform(post("/bookings/1/cancel"))
@@ -208,7 +243,7 @@ class BookingControllerTest {
 
     @Test
     void cancelBookingReturns409WhenBookingNotPending() throws Exception {
-        when(bookingService.cancel(1L)).thenThrow(new InvalidBookingState("Booking not pending"));
+        when(bookingService.cancel(1L)).thenThrow(new InvalidBookingStateException("Booking not pending"));
 
         mockMvc.perform(post("/bookings/1/cancel"))
                .andExpect(status().isConflict());

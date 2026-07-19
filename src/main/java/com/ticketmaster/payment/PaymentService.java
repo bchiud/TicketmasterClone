@@ -1,6 +1,10 @@
 package com.ticketmaster.payment;
 
-import com.ticketmaster.booking.*;
+import com.ticketmaster.booking.Booking;
+import com.ticketmaster.booking.BookingRepository;
+import com.ticketmaster.booking.BookingService;
+import com.ticketmaster.booking.BookingStatus;
+import com.ticketmaster.booking.exception.InvalidBookingStateException;
 import jakarta.transaction.Transactional;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -44,7 +48,7 @@ public class PaymentService {
                                                    () -> new NoSuchElementException("Booking not found: " + bookingId));
         if (!booking.getStatus()
                     .equals(BookingStatus.CONFIRMED))
-            throw new InvalidBookingState("Booking not confirmed: " + bookingId);
+            throw new InvalidBookingStateException("Booking not confirmed: " + bookingId);
 
         List<Payment> payments = paymentRepository.findByBookingId(bookingId);
         for (Payment payment : payments) {

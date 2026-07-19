@@ -1,6 +1,6 @@
 package com.ticketmaster.payment;
 
-import com.ticketmaster.booking.Booking;
+import com.ticketmaster.booking.BookingResponse;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -20,18 +20,22 @@ public class PaymentController {
     }
 
     @GetMapping("/payments/{id}")
-    public Payment getPayment(@PathVariable Long id) {
-        return paymentRepository.findById(id)
-                                .orElseThrow(() -> new NoSuchElementException("Payment not found: " + id));
+    public PaymentResponse getPayment(@PathVariable Long id) {
+        return PaymentResponse.from(paymentRepository.findById(id)
+                                                     .orElseThrow(() -> new NoSuchElementException(
+                                                             "Payment not found: " + id)));
     }
 
     @GetMapping("/bookings/{id}/payments")
-    public List<Payment> getPaymentsByBookingId(@PathVariable Long id) {
-        return paymentRepository.findByBookingId(id);
+    public List<PaymentResponse> getPaymentsByBookingId(@PathVariable Long id) {
+        return paymentRepository.findByBookingId(id)
+                                .stream()
+                                .map(PaymentResponse::from)
+                                .toList();
     }
 
     @PostMapping("/bookings/{id}/refund")
-    public Booking refundBooking(@PathVariable Long id) {
-        return paymentService.refund(id);
+    public BookingResponse refundBooking(@PathVariable Long id) {
+        return BookingResponse.from(paymentService.refund(id));
     }
 }

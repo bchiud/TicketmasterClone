@@ -4,6 +4,7 @@ import com.ticketmaster.booking.Booking;
 import com.ticketmaster.booking.BookingRepository;
 import com.ticketmaster.booking.BookingService;
 import com.ticketmaster.booking.BookingStatus;
+import com.ticketmaster.event.exception.EventAlreadyCancelledException;
 import com.ticketmaster.payment.PaymentRepository;
 import com.ticketmaster.payment.PaymentService;
 import com.ticketmaster.payment.PaymentStatus;
@@ -36,7 +37,13 @@ import static org.mockito.Mockito.verify;
 
 @DataJpaTest
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
-@Import({EventCancellationService.class, BookingService.class, PaymentService.class, EventService.class, TicketService.class})
+@Import({
+        EventCancellationService.class,
+        BookingService.class,
+        PaymentService.class,
+        EventService.class,
+        TicketService.class
+})
 class EventCancellationServiceTest {
 
     @Autowired

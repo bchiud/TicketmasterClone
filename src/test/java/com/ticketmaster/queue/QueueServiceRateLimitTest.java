@@ -3,14 +3,13 @@ package com.ticketmaster.queue;
 import com.ticketmaster.event.Event;
 import com.ticketmaster.event.EventRepository;
 import com.ticketmaster.event.EventStatus;
+import com.ticketmaster.queue.exception.RateLimitException;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.TestPropertySource;
 
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatCode;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.*;
 
 // unlike QueueServiceTest (which holds the limit high to test queue mechanics), this suite pins
 // the limit low to exercise the rate limiter itself. window is effectively infinite so the count

@@ -1,4 +1,4 @@
-package com.ticketmaster.ticket;
+package com.ticketmaster.ticket.exception;
 
 public class TicketLimitedExceededException extends RuntimeException {
     public TicketLimitedExceededException() {

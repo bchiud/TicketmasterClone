@@ -7,8 +7,8 @@ import com.ticketmaster.ticket.TicketRepository;
 import com.ticketmaster.ticket.TicketService;
 import com.ticketmaster.ticket.TicketStatus;
 import com.ticketmaster.venue.Venue;
-import com.ticketmaster.venue.VenueHasNoSeatsException;
 import com.ticketmaster.venue.VenueRepository;
+import com.ticketmaster.venue.exception.VenueHasNoSeatsException;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
@@ -90,7 +90,7 @@ class EventServiceTest {
     @Test
     void activatesAScheduledEventWhosOnSaleTimeHasPassed() {
         Event event = saveEvent(ZonedDateTime.now()
-                                              .minusMinutes(1));
+                                             .minusMinutes(1));
 
         eventService.activateOnSaleEvents();
 
@@ -104,7 +104,7 @@ class EventServiceTest {
     @Test
     void doesNotActivateAnEventWhosOnSaleTimeHasNotYetArrived() {
         Event event = saveEvent(ZonedDateTime.now()
-                                              .plusDays(1));
+                                             .plusDays(1));
 
         eventService.activateOnSaleEvents();
 
@@ -118,7 +118,7 @@ class EventServiceTest {
     @Test
     void doesNotReactivateAnEventThatIsAlreadyPastScheduled() {
         Event event = saveEvent(ZonedDateTime.now()
-                                              .minusMinutes(1));
+                                             .minusMinutes(1));
         event.setStatus(EventStatus.SOLD_OUT);
         eventRepository.save(event);
 

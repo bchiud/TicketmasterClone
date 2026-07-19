@@ -17,15 +17,22 @@ public class TicketController {
     }
 
     @GetMapping("/tickets/{id}")
-    public Ticket getTicketById(@PathVariable Long id) {
-        return ticketRepository.findById(id)
-                               .orElseThrow(() -> new NoSuchElementException("Ticket not found: " + id));
+    public TicketResponse getTicketById(@PathVariable Long id) {
+        return TicketResponse.from(ticketRepository.findById(id)
+                                                   .orElseThrow(() -> new NoSuchElementException(
+                                                           "Ticket not found: " + id)));
     }
 
     @GetMapping("/events/{eventId}/tickets")
-    public List<Ticket> getTicketsForEvent(@PathVariable Long eventId,
-                                           @RequestParam(required = false) TicketStatus status) {
-        if (status != null) return ticketRepository.findByEventIdAndStatus(eventId, status);
-        return ticketRepository.findByEventId(eventId);
+    public List<TicketResponse> getTicketsForEvent(@PathVariable Long eventId,
+                                                   @RequestParam(required = false) TicketStatus status) {
+        if (status != null) return ticketRepository.findByEventIdAndStatus(eventId, status)
+                                                   .stream()
+                                                   .map(TicketResponse::from)
+                                                   .toList();
+        return ticketRepository.findByEventId(eventId)
+                               .stream()
+                               .map(TicketResponse::from)
+                               .toList();
     }
 }

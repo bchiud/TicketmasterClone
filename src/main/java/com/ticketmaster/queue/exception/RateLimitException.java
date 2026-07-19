@@ -1,4 +1,4 @@
-package com.ticketmaster.queue;
+package com.ticketmaster.queue.exception;
 
 public class RateLimitException extends RuntimeException {
     public RateLimitException() {

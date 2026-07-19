@@ -1,10 +1,15 @@
 package com.ticketmaster.booking;
 
+import com.ticketmaster.booking.exception.InvalidBookingStateException;
 import com.ticketmaster.event.Event;
 import com.ticketmaster.event.EventService;
-import com.ticketmaster.queue.QueueAccessRequiredException;
 import com.ticketmaster.queue.QueueService;
-import com.ticketmaster.ticket.*;
+import com.ticketmaster.queue.exception.QueueAccessRequiredException;
+import com.ticketmaster.ticket.Ticket;
+import com.ticketmaster.ticket.TicketRepository;
+import com.ticketmaster.ticket.TicketStatus;
+import com.ticketmaster.ticket.exception.TicketLimitedExceededException;
+import com.ticketmaster.ticket.exception.TicketUnavailableException;
 import com.ticketmaster.user.UserRepository;
 import jakarta.annotation.PostConstruct;
 import jakarta.transaction.Transactional;
@@ -117,9 +122,9 @@ public class BookingService {
                                                    "Booking not found: " + bookingId));
 
         if (!booking.getStatus()
-                    .equals(BookingStatus.PENDING)) throw new InvalidBookingState("Booking not pending");
+                    .equals(BookingStatus.PENDING)) throw new InvalidBookingStateException("Booking not pending");
         if (booking.getExpiresAt()
-                   .isBefore(Instant.now())) throw new InvalidBookingState("Booking expired");
+                   .isBefore(Instant.now())) throw new InvalidBookingStateException("Booking expired");
 
         booking.setStatus(BookingStatus.CONFIRMED);
         for (Ticket ticket : booking.getTickets())
@@ -173,7 +178,8 @@ public class BookingService {
 
         // BookingStatus.CONFIRMED for refund flow
         if (!EnumSet.of(BookingStatus.PENDING, BookingStatus.CONFIRMED)
-                    .contains(booking.getStatus())) throw new InvalidBookingState("Booking not pending or confirmed");
+                    .contains(booking.getStatus()))
+            throw new InvalidBookingStateException("Booking not pending or confirmed");
 
         booking.setStatus(BookingStatus.CANCELLED);
         for (Ticket ticket : booking.getTickets()) {

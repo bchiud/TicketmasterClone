@@ -1,5 +1,6 @@
 package com.ticketmaster.seat;
 
+import com.ticketmaster.venue.Venue;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
@@ -23,11 +24,19 @@ class SeatControllerTest {
     @MockitoBean
     private SeatRepository seatRepository;
 
+    // SeatResponse.from() flattens the venue to venueId, so fixture seats need a venue.
+    private static Venue venue() {
+        Venue venue = new Venue();
+        venue.setId(5L);
+        return venue;
+    }
+
     @Test
     void getSeatReturnsSeatWhenFound() throws Exception {
         Seat seat = new Seat();
         seat.setId(1L);
         seat.setSection("A");
+        seat.setVenue(venue());
         when(seatRepository.findById(1L)).thenReturn(Optional.of(seat));
 
         mockMvc.perform(get("/seats/1"))
@@ -48,6 +57,7 @@ class SeatControllerTest {
         Seat seat = new Seat();
         seat.setId(1L);
         seat.setSection("B");
+        seat.setVenue(venue());
         when(seatRepository.findByVenueId(5L)).thenReturn(List.of(seat));
 
         mockMvc.perform(get("/venues/5/seats"))

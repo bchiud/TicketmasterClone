@@ -17,13 +17,13 @@ public class SeatController {
     }
 
     @GetMapping("/seats/{id}")
-    public Seat getSeat(@PathVariable Long id) {
-        return seatRepository.findById(id)
-                             .orElseThrow(() -> new NoSuchElementException("Seat not found: " + id));
+    public SeatResponse getSeat(@PathVariable Long id) {
+        return SeatResponse.from(seatRepository.findById(id)
+                                               .orElseThrow(() -> new NoSuchElementException("Seat not found: " + id)));
     }
 
     @GetMapping("/venues/{venueId}/seats")
-    public List<Seat> getSeats(@PathVariable Long venueId) {
-        return seatRepository.findByVenueId(venueId);
+    public List<SeatResponse> getSeats(@PathVariable Long venueId) {
+        return seatRepository.findByVenueId(venueId).stream().map(SeatResponse::from).toList();
     }
 }

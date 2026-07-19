@@ -1,13 +1,13 @@
 package com.ticketmaster.common;
 
-import com.ticketmaster.booking.InvalidBookingState;
-import com.ticketmaster.event.EventAlreadyCancelledException;
-import com.ticketmaster.event.EventNotOnSaleException;
-import com.ticketmaster.queue.QueueAccessRequiredException;
-import com.ticketmaster.queue.RateLimitException;
-import com.ticketmaster.ticket.TicketLimitedExceededException;
-import com.ticketmaster.ticket.TicketUnavailableException;
-import com.ticketmaster.venue.VenueHasNoSeatsException;
+import com.ticketmaster.booking.exception.InvalidBookingStateException;
+import com.ticketmaster.event.exception.EventAlreadyCancelledException;
+import com.ticketmaster.event.exception.EventNotOnSaleException;
+import com.ticketmaster.queue.exception.QueueAccessRequiredException;
+import com.ticketmaster.queue.exception.RateLimitException;
+import com.ticketmaster.ticket.exception.TicketLimitedExceededException;
+import com.ticketmaster.ticket.exception.TicketUnavailableException;
+import com.ticketmaster.venue.exception.VenueHasNoSeatsException;
 import org.springframework.dao.ConcurrencyFailureException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -38,8 +38,8 @@ public class ApiExceptionHandler {
                              .body(ex.getMessage());
     }
 
-    @ExceptionHandler(InvalidBookingState.class)
-    public ResponseEntity<String> handleInvalidBookingState(InvalidBookingState ex) {
+    @ExceptionHandler(InvalidBookingStateException.class)
+    public ResponseEntity<String> handleInvalidBookingState(InvalidBookingStateException ex) {
         return ResponseEntity.status(HttpStatus.CONFLICT)
                              .body(ex.getMessage());
     }

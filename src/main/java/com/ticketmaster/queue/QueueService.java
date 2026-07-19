@@ -1,6 +1,7 @@
 package com.ticketmaster.queue;
 
 import com.ticketmaster.event.EventService;
+import com.ticketmaster.queue.exception.RateLimitException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.core.Cursor;

@@ -1,6 +1,6 @@
-package com.ticketmaster.queue;
+package com.ticketmaster.queue.exception;
 
-public class QueueAccessRequiredException  extends RuntimeException {
+public class QueueAccessRequiredException extends RuntimeException {
     public QueueAccessRequiredException() {
         super();
     }

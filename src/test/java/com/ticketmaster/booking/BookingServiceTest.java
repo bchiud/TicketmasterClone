@@ -1,20 +1,21 @@
 package com.ticketmaster.booking;
 
+import com.ticketmaster.booking.exception.InvalidBookingStateException;
 import com.ticketmaster.event.Event;
-import com.ticketmaster.event.EventNotOnSaleException;
 import com.ticketmaster.event.EventRepository;
 import com.ticketmaster.event.EventService;
 import com.ticketmaster.event.EventStatus;
-import com.ticketmaster.queue.QueueAccessRequiredException;
+import com.ticketmaster.event.exception.EventNotOnSaleException;
 import com.ticketmaster.queue.QueueService;
+import com.ticketmaster.queue.exception.QueueAccessRequiredException;
 import com.ticketmaster.seat.Seat;
 import com.ticketmaster.seat.SeatRepository;
 import com.ticketmaster.ticket.Ticket;
-import com.ticketmaster.ticket.TicketLimitedExceededException;
 import com.ticketmaster.ticket.TicketRepository;
 import com.ticketmaster.ticket.TicketService;
 import com.ticketmaster.ticket.TicketStatus;
-import com.ticketmaster.ticket.TicketUnavailableException;
+import com.ticketmaster.ticket.exception.TicketLimitedExceededException;
+import com.ticketmaster.ticket.exception.TicketUnavailableException;
 import com.ticketmaster.user.User;
 import com.ticketmaster.user.UserRepository;
 import com.ticketmaster.venue.Venue;
@@ -159,7 +160,11 @@ class BookingServiceTest {
         bookingService.hold(user.getId(), event.getId(), List.of(ticket.getId()), "idem-3", null);
 
         assertThatThrownBy(() ->
-                bookingService.hold(user.getId(), event.getId(), List.of(ticket.getId()), "idem-4", null))
+                                   bookingService.hold(user.getId(),
+                                                       event.getId(),
+                                                       List.of(ticket.getId()),
+                                                       "idem-4",
+                                                       null))
                 .isInstanceOf(TicketUnavailableException.class);
     }
 
@@ -169,7 +174,7 @@ class BookingServiceTest {
         Event event = saveEvent();
 
         assertThatThrownBy(() ->
-                bookingService.hold(user.getId(), event.getId(), List.of(999L), "idem-5", null))
+                                   bookingService.hold(user.getId(), event.getId(), List.of(999L), "idem-5", null))
                 .isInstanceOf(TicketUnavailableException.class);
     }
 
@@ -214,7 +219,11 @@ class BookingServiceTest {
         Ticket ticket = saveTicket(event, "1", 100);
 
         assertThatThrownBy(() ->
-                bookingService.hold(user.getId(), event.getId(), List.of(ticket.getId()), "idem-not-on-sale", null))
+                                   bookingService.hold(user.getId(),
+                                                       event.getId(),
+                                                       List.of(ticket.getId()),
+                                                       "idem-not-on-sale",
+                                                       null))
                 .isInstanceOf(EventNotOnSaleException.class);
     }
 
@@ -265,7 +274,7 @@ class BookingServiceTest {
         User user = saveUser();
 
         assertThatThrownBy(() ->
-                bookingService.hold(user.getId(), 999L, List.of(1L), "idem-no-event", null))
+                                   bookingService.hold(user.getId(), 999L, List.of(1L), "idem-no-event", null))
                 .isInstanceOf(NoSuchElementException.class);
     }
 
@@ -274,7 +283,11 @@ class BookingServiceTest {
         User user = saveUser();
         Event event = saveEvent();
         Ticket ticket = saveTicket(event, "1", 100);
-        Booking booking = bookingService.hold(user.getId(), event.getId(), List.of(ticket.getId()), "idem-soldout-1", null);
+        Booking booking = bookingService.hold(user.getId(),
+                                              event.getId(),
+                                              List.of(ticket.getId()),
+                                              "idem-soldout-1",
+                                              null);
 
         bookingService.confirm(booking.getId());
 
@@ -291,7 +304,11 @@ class BookingServiceTest {
         Event event = saveEvent();
         Ticket ticketA = saveTicket(event, "1", 100);
         saveTicket(event, "2", 100); // left AVAILABLE
-        Booking booking = bookingService.hold(user.getId(), event.getId(), List.of(ticketA.getId()), "idem-soldout-2", null);
+        Booking booking = bookingService.hold(user.getId(),
+                                              event.getId(),
+                                              List.of(ticketA.getId()),
+                                              "idem-soldout-2",
+                                              null);
 
         bookingService.confirm(booking.getId());
 
@@ -308,7 +325,7 @@ class BookingServiceTest {
         Ticket ticket = saveTicket(event, "1", 100);
 
         assertThatThrownBy(() ->
-                bookingService.hold(999L, event.getId(), List.of(ticket.getId()), "idem-6", null))
+                                   bookingService.hold(999L, event.getId(), List.of(ticket.getId()), "idem-6", null))
                 .isInstanceOf(NoSuchElementException.class);
     }
 
@@ -317,7 +334,11 @@ class BookingServiceTest {
         User user = saveUser();
         Event event = saveEvent();
         Ticket ticket = saveTicket(event, "1", 100);
-        Booking booking = bookingService.hold(user.getId(), event.getId(), List.of(ticket.getId()), "idem-cancel-1", null);
+        Booking booking = bookingService.hold(user.getId(),
+                                              event.getId(),
+                                              List.of(ticket.getId()),
+                                              "idem-cancel-1",
+                                              null);
 
         Booking cancelled = bookingService.cancel(booking.getId());
 
@@ -328,7 +349,8 @@ class BookingServiceTest {
                 .extracting(Ticket::getStatus)
                 .isEqualTo(TicketStatus.AVAILABLE);
         assertThat(ticketRepository.findById(ticket.getId())).get()
-                .extracting(Ticket::getBooking).isNull();   // released ticket detaches from the booking
+                                                             .extracting(Ticket::getBooking)
+                                                             .isNull();   // released ticket detaches from the booking
     }
 
     @Test
@@ -336,7 +358,11 @@ class BookingServiceTest {
         User user = saveUser();
         Event event = saveEvent();
         Ticket ticket = saveTicket(event, "1", 100);
-        Booking booking = bookingService.hold(user.getId(), event.getId(), List.of(ticket.getId()), "idem-cancel-2", null);
+        Booking booking = bookingService.hold(user.getId(),
+                                              event.getId(),
+                                              List.of(ticket.getId()),
+                                              "idem-cancel-2",
+                                              null);
         bookingService.confirm(booking.getId());
 
         Booking cancelled = bookingService.cancel(booking.getId());
@@ -348,7 +374,8 @@ class BookingServiceTest {
                 .extracting(Ticket::getStatus)
                 .isEqualTo(TicketStatus.AVAILABLE);
         assertThat(ticketRepository.findById(ticket.getId())).get()
-                .extracting(Ticket::getBooking).isNull();   // released ticket detaches from the booking
+                                                             .extracting(Ticket::getBooking)
+                                                             .isNull();   // released ticket detaches from the booking
     }
 
     @Test
@@ -356,11 +383,15 @@ class BookingServiceTest {
         User user = saveUser();
         Event event = saveEvent();
         Ticket ticket = saveTicket(event, "1", 100);
-        Booking booking = bookingService.hold(user.getId(), event.getId(), List.of(ticket.getId()), "idem-cancel-3", null);
+        Booking booking = bookingService.hold(user.getId(),
+                                              event.getId(),
+                                              List.of(ticket.getId()),
+                                              "idem-cancel-3",
+                                              null);
         bookingService.cancel(booking.getId());
 
         assertThatThrownBy(() -> bookingService.cancel(booking.getId()))
-                .isInstanceOf(InvalidBookingState.class);
+                .isInstanceOf(InvalidBookingStateException.class);
     }
 
     @Test
@@ -374,7 +405,11 @@ class BookingServiceTest {
         User user = saveUser();
         Event event = saveEvent();
         Ticket ticket = saveTicket(event, "1", 100);
-        Booking booking = bookingService.hold(user.getId(), event.getId(), List.of(ticket.getId()), "idem-confirm-1", null);
+        Booking booking = bookingService.hold(user.getId(),
+                                              event.getId(),
+                                              List.of(ticket.getId()),
+                                              "idem-confirm-1",
+                                              null);
 
         Booking confirmed = bookingService.confirm(booking.getId());
 
@@ -391,11 +426,15 @@ class BookingServiceTest {
         User user = saveUser();
         Event event = saveEvent();
         Ticket ticket = saveTicket(event, "1", 100);
-        Booking booking = bookingService.hold(user.getId(), event.getId(), List.of(ticket.getId()), "idem-confirm-2", null);
+        Booking booking = bookingService.hold(user.getId(),
+                                              event.getId(),
+                                              List.of(ticket.getId()),
+                                              "idem-confirm-2",
+                                              null);
         bookingService.confirm(booking.getId());
 
         assertThatThrownBy(() -> bookingService.confirm(booking.getId()))
-                .isInstanceOf(InvalidBookingState.class);
+                .isInstanceOf(InvalidBookingStateException.class);
     }
 
     @Test
@@ -403,13 +442,17 @@ class BookingServiceTest {
         User user = saveUser();
         Event event = saveEvent();
         Ticket ticket = saveTicket(event, "1", 100);
-        Booking booking = bookingService.hold(user.getId(), event.getId(), List.of(ticket.getId()), "idem-confirm-3", null);
+        Booking booking = bookingService.hold(user.getId(),
+                                              event.getId(),
+                                              List.of(ticket.getId()),
+                                              "idem-confirm-3",
+                                              null);
         booking.setExpiresAt(Instant.now()
-                                     .minusSeconds(60));
+                                    .minusSeconds(60));
         bookingRepository.saveAndFlush(booking);
 
         assertThatThrownBy(() -> bookingService.confirm(booking.getId()))
-                .isInstanceOf(InvalidBookingState.class);
+                .isInstanceOf(InvalidBookingStateException.class);
     }
 
     @Test
@@ -425,7 +468,7 @@ class BookingServiceTest {
         Ticket ticket = saveTicket(event, "1", 100);
         Booking booking = bookingService.hold(user.getId(), event.getId(), List.of(ticket.getId()), "idem-7", null);
         booking.setExpiresAt(Instant.now()
-                                     .minusSeconds(60));
+                                    .minusSeconds(60));
         bookingRepository.saveAndFlush(booking);
 
         bookingService.expire();
@@ -471,7 +514,7 @@ class BookingServiceTest {
         Booking booking = bookingService.hold(user.getId(), event.getId(), List.of(ticket.getId()), "idem-9", null);
         bookingService.confirm(booking.getId());
         booking.setExpiresAt(Instant.now()
-                                     .minusSeconds(60));
+                                    .minusSeconds(60));
         bookingRepository.saveAndFlush(booking);
 
         bookingService.expire();

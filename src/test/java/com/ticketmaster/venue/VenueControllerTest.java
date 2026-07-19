@@ -15,9 +15,7 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.containsString;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
@@ -87,8 +85,8 @@ class VenueControllerTest {
         when(venueRepository.save(any(Venue.class))).thenReturn(saved);
 
         postVenue("""
-                  {"name":"The Fillmore","address":"1805 Geary Blvd","city":"San Francisco"}
-                  """)
+                          {"name":"The Fillmore","address":"1805 Geary Blvd","city":"San Francisco"}
+                          """)
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.id").value(7))
                 .andExpect(jsonPath("$.name").value("The Fillmore"))
@@ -102,8 +100,8 @@ class VenueControllerTest {
         when(venueRepository.save(any(Venue.class))).thenAnswer(inv -> inv.getArgument(0));
 
         postVenue("""
-                  {"id":99,"name":"The Fillmore","address":"1805 Geary Blvd","city":"San Francisco"}
-                  """)
+                          {"id":99,"name":"The Fillmore","address":"1805 Geary Blvd","city":"San Francisco"}
+                          """)
                 .andExpect(status().isCreated());
 
         verify(venueRepository).save(captor.capture());
@@ -124,8 +122,8 @@ class VenueControllerTest {
     @Test
     void createVenueRejectsNullFields() throws Exception {
         postVenue("""
-                  {"name":null,"address":null,"city":null}
-                  """)
+                          {"name":null,"address":null,"city":null}
+                          """)
                 .andExpect(status().isBadRequest());
 
         verify(venueRepository, never()).save(any(Venue.class));
@@ -135,13 +133,13 @@ class VenueControllerTest {
     @Test
     void createVenueRejectsBlankAndWhitespaceOnlyFields() throws Exception {
         postVenue("""
-                  {"name":"","address":"","city":""}
-                  """)
+                          {"name":"","address":"","city":""}
+                          """)
                 .andExpect(status().isBadRequest());
 
         postVenue("""
-                  {"name":"   ","address":"  ","city":" "}
-                  """)
+                          {"name":"   ","address":"  ","city":" "}
+                          """)
                 .andExpect(status().isBadRequest());
 
         verify(venueRepository, never()).save(any(Venue.class));

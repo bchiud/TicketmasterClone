@@ -3,7 +3,7 @@ package com.ticketmaster.ticket;
 import com.ticketmaster.event.Event;
 import com.ticketmaster.seat.Seat;
 import com.ticketmaster.seat.SeatRepository;
-import com.ticketmaster.venue.VenueHasNoSeatsException;
+import com.ticketmaster.venue.exception.VenueHasNoSeatsException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 

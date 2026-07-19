@@ -1,9 +1,9 @@
 package com.ticketmaster.queue;
 
 import com.ticketmaster.event.Event;
-import com.ticketmaster.event.EventNotOnSaleException;
 import com.ticketmaster.event.EventRepository;
 import com.ticketmaster.event.EventStatus;
+import com.ticketmaster.event.exception.EventNotOnSaleException;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;

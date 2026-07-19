@@ -26,31 +26,32 @@ public class EventController {
     }
 
     @GetMapping("")
-    public Page<Event> getAllEvents(@RequestParam(required = false) String name,
-                                    @RequestParam(required = false) EventStatus status,
-                                    @RequestParam(required = false) String city,
-                                    @RequestParam(required = false) String performer,
-                                    @RequestParam(required = false) ZonedDateTime from,
-                                    @RequestParam(required = false) ZonedDateTime to,
-                                    @PageableDefault(size = 20, sort = "startsAt") Pageable pageable) {
-        return eventRepository.findAll(EventSpecifications.matching(name, status, city, performer, from, to), pageable);
+    public Page<EventResponse> getAllEvents(@RequestParam(required = false) String name,
+                                            @RequestParam(required = false) EventStatus status,
+                                            @RequestParam(required = false) String city,
+                                            @RequestParam(required = false) String performer,
+                                            @RequestParam(required = false) ZonedDateTime from,
+                                            @RequestParam(required = false) ZonedDateTime to,
+                                            @PageableDefault(size = 20, sort = "startsAt") Pageable pageable) {
+        return eventRepository.findAll(EventSpecifications.matching(name, status, city, performer, from, to), pageable).map(EventResponse::from);
     }
 
     @GetMapping("/{id}")
-    public Event getEventById(@PathVariable Long id) {
-        return eventRepository.findById(id)
-                              .orElseThrow(() -> new NoSuchElementException("Event not found: " + id));
+    public EventResponse getEventById(@PathVariable Long id) {
+        return EventResponse.from(eventRepository.findById(id)
+                                                 .orElseThrow(() -> new NoSuchElementException(
+                                                         "Event not found: " + id)));
     }
 
     @PostMapping("")
     @ResponseStatus(HttpStatus.CREATED)
-    public Event createEvent(@Valid @RequestBody EventCreateRequest eventCreateRequest) {
-        return eventService.createEvent(eventCreateRequest);
+    public EventResponse createEvent(@Valid @RequestBody EventCreateRequest eventCreateRequest) {
+        return EventResponse.from(eventService.createEvent(eventCreateRequest));
     }
 
     @PostMapping("/{id}/cancel")
-    public Event cancelEvent(@PathVariable Long id) {
-        return eventCancellationService.cancelEvent(id);
+    public EventResponse cancelEvent(@PathVariable Long id) {
+        return EventResponse.from(eventCancellationService.cancelEvent(id));
     }
 }
 

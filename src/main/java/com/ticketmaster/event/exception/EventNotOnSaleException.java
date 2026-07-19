@@ -1,4 +1,4 @@
-package com.ticketmaster.event;
+package com.ticketmaster.event.exception;
 
 public class EventNotOnSaleException extends RuntimeException {
     public EventNotOnSaleException() {

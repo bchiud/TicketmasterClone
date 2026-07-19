@@ -1,6 +1,6 @@
-package com.ticketmaster.venue;
+package com.ticketmaster.venue.exception;
 
-public class VenueHasNoSeatsException extends RuntimeException{
+public class VenueHasNoSeatsException extends RuntimeException {
     public VenueHasNoSeatsException() {
         super();
     }

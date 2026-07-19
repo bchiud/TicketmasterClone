@@ -4,7 +4,7 @@ import com.ticketmaster.booking.Booking;
 import com.ticketmaster.booking.BookingRepository;
 import com.ticketmaster.booking.BookingService;
 import com.ticketmaster.booking.BookingStatus;
-import com.ticketmaster.booking.InvalidBookingState;
+import com.ticketmaster.booking.exception.InvalidBookingStateException;
 import com.ticketmaster.event.Event;
 import com.ticketmaster.event.EventRepository;
 import com.ticketmaster.event.EventService;
@@ -150,7 +150,7 @@ class PaymentServiceTest {
         paymentService.pay(booking.getId());
 
         assertThatThrownBy(() -> paymentService.pay(booking.getId()))
-                .isInstanceOf(InvalidBookingState.class);
+                .isInstanceOf(InvalidBookingStateException.class);
     }
 
     @Test
@@ -160,10 +160,10 @@ class PaymentServiceTest {
         Ticket ticket = saveTicket(event, "1", 150);
         Booking booking = bookingService.hold(user.getId(), event.getId(), List.of(ticket.getId()), "pay-idem-3", null);
         booking.setExpiresAt(Instant.now()
-                                     .minusSeconds(60));
+                                    .minusSeconds(60));
         bookingRepository.saveAndFlush(booking);
 
         assertThatThrownBy(() -> paymentService.pay(booking.getId()))
-                .isInstanceOf(InvalidBookingState.class);
+                .isInstanceOf(InvalidBookingStateException.class);
     }
 }

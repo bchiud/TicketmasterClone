@@ -90,7 +90,7 @@ class BookingRepositoryTest {
         booking.setTotalCents(5000);
         booking.setIdempotencyKey(idempotencyKey);
         booking.setExpiresAt(Instant.now()
-                                     .plusSeconds(600));
+                                    .plusSeconds(600));
         return booking;
     }
 
@@ -129,7 +129,7 @@ class BookingRepositoryTest {
         Event event = saveEvent(venue);
         bookingRepository.save(newBooking(user, event, "idem-3"));
 
-        List<Booking> results = bookingRepository.findByUserId(user.getId());
+        List<Booking> results = bookingRepository.findWithTicketsByUserId(user.getId());
 
         assertThat(results).hasSize(1);
     }
@@ -157,14 +157,14 @@ class BookingRepositoryTest {
         Event event = saveEvent(venue);
         Booking booking = newBooking(user, event, "idem-5");
         booking.setExpiresAt(Instant.now()
-                                     .minusSeconds(60));
+                                    .minusSeconds(60));
         bookingRepository.save(booking);
 
         List<Booking> expired = bookingRepository.findByStatusAndExpiresAtBefore(
                 BookingStatus.PENDING, Instant.now());
         List<Booking> notYetExpired = bookingRepository.findByStatusAndExpiresAtBefore(
                 BookingStatus.PENDING, Instant.now()
-                                               .minusSeconds(120));
+                                              .minusSeconds(120));
 
         assertThat(expired).hasSize(1);
         assertThat(notYetExpired).isEmpty();
@@ -186,7 +186,7 @@ class BookingRepositoryTest {
                 .isPresent()
                 .get()
                 .extracting(b -> b.getTickets()
-                                   .size())
+                                  .size())
                 .isEqualTo(2);
     }
 }

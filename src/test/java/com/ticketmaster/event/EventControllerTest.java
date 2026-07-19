@@ -1,12 +1,13 @@
 package com.ticketmaster.event;
 
 import com.ticketmaster.common.WebConfig;
-import com.ticketmaster.venue.VenueHasNoSeatsException;
+import com.ticketmaster.event.exception.EventAlreadyCancelledException;
+import com.ticketmaster.venue.Venue;
+import com.ticketmaster.venue.exception.VenueHasNoSeatsException;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Import;
-import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
@@ -19,12 +20,11 @@ import java.util.NoSuchElementException;
 import java.util.Optional;
 
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(EventController.class)
 @Import(WebConfig.class)   // apply VIA_DTO Page serialization so the slice matches production JSON
@@ -46,6 +46,13 @@ class EventControllerTest {
     // MockMvc, so these tests verify wiring + param binding only. The predicate semantics (name,
     // status, city, performer, date range) are covered against real Postgres in EventSpecificationsTest.
 
+    // EventResponse.from() flattens the venue to venueId, so fixture events need a venue.
+    private static Venue venue() {
+        Venue venue = new Venue();
+        venue.setId(9L);
+        return venue;
+    }
+
     @Test
     void getAllEventsReturnsEmptyPageWhenNoneExist() throws Exception {
         when(eventRepository.findAll(any(Specification.class), any(Pageable.class)))
@@ -62,6 +69,7 @@ class EventControllerTest {
         Event event = new Event();
         event.setId(1L);
         event.setName("Test Concert");
+        event.setVenue(venue());
         when(eventRepository.findAll(any(Specification.class), any(Pageable.class)))
                 .thenReturn(new PageImpl<>(List.of(event)));
 
@@ -75,6 +83,7 @@ class EventControllerTest {
         Event event = new Event();
         event.setId(1L);
         event.setName("Summer Jam");
+        event.setVenue(venue());
         when(eventRepository.findAll(any(Specification.class), any(Pageable.class)))
                 .thenReturn(new PageImpl<>(List.of(event)));
 
@@ -94,6 +103,7 @@ class EventControllerTest {
         Event event = new Event();
         event.setId(1L);
         event.setName("Test Concert");
+        event.setVenue(venue());
         when(eventRepository.findById(1L)).thenReturn(Optional.of(event));
 
         mockMvc.perform(get("/events/1"))
@@ -114,6 +124,7 @@ class EventControllerTest {
         Event event = new Event();
         event.setId(1L);
         event.setStatus(EventStatus.CANCELLED);
+        event.setVenue(venue());
         when(eventCancellationService.cancelEvent(1L)).thenReturn(event);
 
         mockMvc.perform(post("/events/1/cancel"))
@@ -150,6 +161,7 @@ class EventControllerTest {
         Event created = new Event();
         created.setId(5L);
         created.setName("Fan-out Fest");
+        created.setVenue(venue());
         when(eventService.createEvent(any(EventCreateRequest.class))).thenReturn(created);
 
         mockMvc.perform(post("/events").contentType(MediaType.APPLICATION_JSON)

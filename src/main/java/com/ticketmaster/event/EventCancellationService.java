@@ -4,6 +4,7 @@ import com.ticketmaster.booking.Booking;
 import com.ticketmaster.booking.BookingRepository;
 import com.ticketmaster.booking.BookingService;
 import com.ticketmaster.booking.BookingStatus;
+import com.ticketmaster.event.exception.EventAlreadyCancelledException;
 import com.ticketmaster.payment.PaymentService;
 import com.ticketmaster.queue.QueueService;
 import com.ticketmaster.ticket.TicketService;

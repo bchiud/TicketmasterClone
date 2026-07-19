@@ -1,4 +1,4 @@
-package com.ticketmaster.ticket;
+package com.ticketmaster.ticket.exception;
 
 public class TicketUnavailableException extends RuntimeException {
     public TicketUnavailableException() {

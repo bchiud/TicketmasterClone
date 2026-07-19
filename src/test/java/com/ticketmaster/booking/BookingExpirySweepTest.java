@@ -42,13 +42,20 @@ import static org.assertj.core.api.Assertions.assertThat;
 })
 class BookingExpirySweepTest {
 
-    @Autowired private BookingService bookingService;
-    @Autowired private BookingRepository bookingRepository;
-    @Autowired private TicketRepository ticketRepository;
-    @Autowired private EventRepository eventRepository;
-    @Autowired private SeatRepository seatRepository;
-    @Autowired private VenueRepository venueRepository;
-    @Autowired private UserRepository userRepository;
+    @Autowired
+    private BookingService bookingService;
+    @Autowired
+    private BookingRepository bookingRepository;
+    @Autowired
+    private TicketRepository ticketRepository;
+    @Autowired
+    private EventRepository eventRepository;
+    @Autowired
+    private SeatRepository seatRepository;
+    @Autowired
+    private VenueRepository venueRepository;
+    @Autowired
+    private UserRepository userRepository;
 
     private Long bookingId, ticketId, eventId, seatId, venueId, userId;
 
@@ -100,12 +107,13 @@ class BookingExpirySweepTest {
         bookingService.expire();
 
         assertThat(bookingRepository.findById(bookingId)).get()
-                .extracting(Booking::getStatus).isEqualTo(BookingStatus.EXPIRED);
+                                                         .extracting(Booking::getStatus)
+                                                         .isEqualTo(BookingStatus.EXPIRED);
         assertThat(ticketRepository.findById(ticketId)).get()
-                .extracting(Ticket::getStatus).isEqualTo(TicketStatus.AVAILABLE);
+                                                       .extracting(Ticket::getStatus).isEqualTo(TicketStatus.AVAILABLE);
         // released tickets detach from the expired booking
         assertThat(ticketRepository.findById(ticketId)).get()
-                .extracting(Ticket::getBooking).isNull();
+                                                       .extracting(Ticket::getBooking).isNull();
     }
 
     @AfterEach

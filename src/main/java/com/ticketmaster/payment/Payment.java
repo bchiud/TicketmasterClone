@@ -28,7 +28,7 @@ public class Payment {
     private Integer amountCents;
 
     @Enumerated(EnumType.STRING)
-    private PaymentStatus status =  PaymentStatus.PENDING;
+    private PaymentStatus status = PaymentStatus.PENDING;
 
     @CreationTimestamp
     private ZonedDateTime createdAt;

@@ -18,23 +18,24 @@ public class VenueController {
 
     @PostMapping("")
     @ResponseStatus(HttpStatus.CREATED)
-    public Venue createVenue(@Valid @RequestBody VenueCreateRequest venueCreateRequest) {
+    public VenueResponse createVenue(@Valid @RequestBody VenueCreateRequest venueCreateRequest) {
         Venue venue = new Venue();
         venue.setName(venueCreateRequest.getName());
         venue.setAddress(venueCreateRequest.getAddress());
         venue.setCity(venueCreateRequest.getCity());
-        return venueRepository.save(venue);
+        return VenueResponse.from(venueRepository.save(venue));
     }
 
     @GetMapping("")
-    public List<Venue> getAllVenues() {
-        return venueRepository.findAll();
+    public List<VenueResponse> getAllVenues() {
+        return venueRepository.findAll().stream().map(VenueResponse::from).toList();
     }
 
     @GetMapping("/{id}")
-    public Venue getVenueById(@PathVariable Long id) {
-        return venueRepository.findById(id)
-                              .orElseThrow(() -> new NoSuchElementException("Venue not found: " + id));
+    public VenueResponse getVenueById(@PathVariable Long id) {
+        return VenueResponse.from(venueRepository.findById(id)
+                                                 .orElseThrow(() -> new NoSuchElementException(
+                                                         "Venue not found: " + id)));
     }
 
 
