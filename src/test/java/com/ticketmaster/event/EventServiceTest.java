@@ -202,4 +202,72 @@ class EventServiceTest {
                 request(999_999_999L, ZonedDateTime.now().minusDays(1), 5000, false)))
                 .isInstanceOf(NoSuchElementException.class);
     }
+
+    // --- markSoldOutIfLastTicketBooked: sold out iff nothing sellable (AVAILABLE/HELD) remains ---
+
+    private Event saveOnSaleEventWithTickets(TicketStatus... statuses) {
+        Venue venue = saveVenue();
+        Event event = new Event();
+        event.setName("Sold Out Test");
+        event.setVenue(venue);
+        event.setStartsAt(ZonedDateTime.now().plusDays(30));
+        event.setStatus(EventStatus.ON_SALE);
+        event = eventRepository.save(event);
+        for (int i = 0; i < statuses.length; i++) {
+            Seat seat = new Seat();
+            seat.setVenue(venue);
+            seat.setSection("GA");
+            seat.setRowLabel("A");
+            seat.setSeatNumber(String.valueOf(i));
+            seatRepository.save(seat);
+            Ticket ticket = new Ticket();
+            ticket.setEvent(event);
+            ticket.setSeat(seat);
+            ticket.setPriceCents(5000);
+            ticket.setStatus(statuses[i]);
+            ticketRepository.save(ticket);
+        }
+        return event;
+    }
+
+    private EventStatus reloadStatus(Event event) {
+        return eventRepository.findById(event.getId()).orElseThrow().getStatus();
+    }
+
+    @Test
+    void marksSoldOutWhenEveryTicketIsBooked() {
+        Event event = saveOnSaleEventWithTickets(TicketStatus.BOOKED, TicketStatus.BOOKED);
+
+        eventService.markSoldOutIfLastTicketBooked(event);
+
+        assertThat(reloadStatus(event)).isEqualTo(EventStatus.SOLD_OUT);
+    }
+
+    // the CANCELLED-safe behavior: a voided ticket must not keep the event out of SOLD_OUT
+    @Test
+    void marksSoldOutWhenRemainingNonBookedTicketsAreCancelled() {
+        Event event = saveOnSaleEventWithTickets(TicketStatus.BOOKED, TicketStatus.CANCELLED);
+
+        eventService.markSoldOutIfLastTicketBooked(event);
+
+        assertThat(reloadStatus(event)).isEqualTo(EventStatus.SOLD_OUT);
+    }
+
+    @Test
+    void doesNotMarkSoldOutWhileATicketIsStillAvailable() {
+        Event event = saveOnSaleEventWithTickets(TicketStatus.BOOKED, TicketStatus.AVAILABLE);
+
+        eventService.markSoldOutIfLastTicketBooked(event);
+
+        assertThat(reloadStatus(event)).isEqualTo(EventStatus.ON_SALE);
+    }
+
+    @Test
+    void doesNotMarkSoldOutWhileATicketIsHeld() {
+        Event event = saveOnSaleEventWithTickets(TicketStatus.BOOKED, TicketStatus.HELD);
+
+        eventService.markSoldOutIfLastTicketBooked(event);
+
+        assertThat(reloadStatus(event)).isEqualTo(EventStatus.ON_SALE);
+    }
 }

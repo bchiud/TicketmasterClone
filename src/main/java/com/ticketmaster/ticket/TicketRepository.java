@@ -16,11 +16,8 @@ public interface TicketRepository extends JpaRepository<Ticket, Long> {
     // pessimistic write: lock "SELECT FOR UPDATE"
     // optimistic write: check for changes right before committing
     @Lock(LockModeType.PESSIMISTIC_WRITE)
-    @QueryHints(
-            @QueryHint(
-                    name = "jakarta.persistence.lock.timeout",
-                    value = "0"
-            )
-    )
+    @QueryHints(@QueryHint(name = "jakarta.persistence.lock.timeout", value = "0"))
     List<Ticket> findByIdIn(List<Long> ids);
+
+    long countByEventIdAndStatusIn(Long eventId, List<TicketStatus> statuses);
 }

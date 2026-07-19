@@ -3,6 +3,7 @@ package com.ticketmaster.booking;
 import com.ticketmaster.booking.exception.InvalidBookingStateException;
 import com.ticketmaster.event.Event;
 import com.ticketmaster.event.EventService;
+import com.ticketmaster.event.EventStatus;
 import com.ticketmaster.queue.QueueService;
 import com.ticketmaster.queue.exception.QueueAccessRequiredException;
 import com.ticketmaster.ticket.Ticket;
@@ -66,8 +67,7 @@ public class BookingService {
         List<BookingStatus> openStatuses = new ArrayList<>(List.of(BookingStatus.PENDING, BookingStatus.CONFIRMED));
         int openTickets = bookingRepository.findByUserIdAndEventIdAndStatusIn(userId, eventId, openStatuses)
                                            .stream()
-                                           .mapToInt(b -> b.getTickets()
-                                                           .size())
+                                           .mapToInt(b -> b.getTickets().size())
                                            .sum();
         if ((openTickets + ticketIds.size()) > maxTicketsPerUser)
             throw new TicketLimitedExceededException("Maximum number of tickets per user exceeded");
@@ -85,13 +85,10 @@ public class BookingService {
                 if (ticket.getStatus() != TicketStatus.AVAILABLE)
                     throw new TicketUnavailableException("Ticket %d unavailable".formatted(ticket.getId()));
 
-            int totalCents = tickets.stream()
-                                    .mapToInt(Ticket::getPriceCents)
-                                    .sum();
+            int totalCents = tickets.stream().mapToInt(Ticket::getPriceCents).sum();
 
             // 6. book!
-            ZonedDateTime expiresAt = ZonedDateTime.now()
-                                                   .plusMinutes(10);
+            ZonedDateTime expiresAt = ZonedDateTime.now().plusMinutes(10);
             Booking booking = new Booking();
             booking.setUser(userRepository.findById(userId)
                                           .orElseThrow(() -> new NoSuchElementException("User not found: " + userId)));
@@ -121,10 +118,11 @@ public class BookingService {
                                            .orElseThrow(() -> new NoSuchElementException(
                                                    "Booking not found: " + bookingId));
 
-        if (!booking.getStatus()
-                    .equals(BookingStatus.PENDING)) throw new InvalidBookingStateException("Booking not pending");
-        if (booking.getExpiresAt()
-                   .isBefore(Instant.now())) throw new InvalidBookingStateException("Booking expired");
+        if (!booking.getStatus().equals(BookingStatus.PENDING))
+            throw new InvalidBookingStateException("Booking not pending");
+        if (booking.getExpiresAt().isBefore(Instant.now())) throw new InvalidBookingStateException("Booking expired");
+        if (booking.getEvent().getStatus() == EventStatus.CANCELLED)
+            throw new InvalidBookingStateException("Event cancelled");
 
         booking.setStatus(BookingStatus.CONFIRMED);
         for (Ticket ticket : booking.getTickets())
@@ -177,8 +175,7 @@ public class BookingService {
                                                    "Booking not found: " + bookingId));
 
         // BookingStatus.CONFIRMED for refund flow
-        if (!EnumSet.of(BookingStatus.PENDING, BookingStatus.CONFIRMED)
-                    .contains(booking.getStatus()))
+        if (!EnumSet.of(BookingStatus.PENDING, BookingStatus.CONFIRMED).contains(booking.getStatus()))
             throw new InvalidBookingStateException("Booking not pending or confirmed");
 
         booking.setStatus(BookingStatus.CANCELLED);

@@ -462,6 +462,23 @@ class BookingServiceTest {
     }
 
     @Test
+    void throwsWhenConfirmingABookingWhoseEventWasCancelled() {
+        User user = saveUser();
+        Event event = saveEvent();
+        Ticket ticket = saveTicket(event, "1", 100);
+        Booking booking = bookingService.hold(user.getId(),
+                                              event.getId(),
+                                              List.of(ticket.getId()),
+                                              "idem-confirm-cancelled",
+                                              null);
+        event.setStatus(EventStatus.CANCELLED);
+        eventRepository.saveAndFlush(event);
+
+        assertThatThrownBy(() -> bookingService.confirm(booking.getId()))
+                .isInstanceOf(InvalidBookingStateException.class);
+    }
+
+    @Test
     void expiresStaleBookingsAndReleasesTheirTickets() {
         User user = saveUser();
         Event event = saveEvent();

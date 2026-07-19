@@ -53,8 +53,7 @@ public class EventService {
         event.setVenue(venue);
         event.setStartsAt(eventCreateRequest.getStartsAt());
         event.setOnSaleAt(eventCreateRequest.getOnSaleAt());
-        if (eventCreateRequest.getOnSaleAt()
-                              .isBefore(ZonedDateTime.now())) event.setStatus(EventStatus.ON_SALE);
+        if (eventCreateRequest.getOnSaleAt().isBefore(ZonedDateTime.now())) event.setStatus(EventStatus.ON_SALE);
         if (eventCreateRequest.isRequiresQueue()) event.setRequiresQueue(true);
         event = eventRepository.save(event);
 
@@ -71,10 +70,8 @@ public class EventService {
     }
 
     public void markSoldOutIfLastTicketBooked(Event event) {
-        if (ticketRepository.findByEventId(event.getId())
-                            .stream()
-                            .filter(t -> t.getStatus() != TicketStatus.BOOKED)
-                            .count() == 0) {
+        if (ticketRepository.countByEventIdAndStatusesIn(event.getId(),
+                                                         List.of(TicketStatus.AVAILABLE, TicketStatus.HELD)) == 0) {
             event.setStatus(EventStatus.SOLD_OUT);
             eventRepository.save(event);
         }
