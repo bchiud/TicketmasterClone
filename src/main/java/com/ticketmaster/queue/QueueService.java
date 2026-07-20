@@ -101,7 +101,9 @@ public class QueueService {
             for (int i = 0; i < popped.size(); i += 2) {
                 String token = popped.get(i);
                 stringRedisTemplate.opsForValue()
-                                   .set(getAccessKey(Long.valueOf(eventId), token), "1", Duration.ofMinutes(10));
+                                   .set(getAccessKey(Long.valueOf(eventId), token),
+                                        "1",
+                                        Duration.ofMinutes(grantAccessWindowMins));
             }
         }
     }

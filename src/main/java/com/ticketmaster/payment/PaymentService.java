@@ -59,7 +59,7 @@ public class PaymentService {
                 Payment refund = new Payment();
                 refund.setBooking(booking);
                 refund.setProviderRef("fake-" + UUID.randomUUID());
-                refund.setAmountCents(booking.getTotalCents());
+                refund.setAmountCents(payment.getAmountCents());
                 refund.setStatus(PaymentStatus.REFUNDED);
                 paymentRepository.save(refund);
             }
