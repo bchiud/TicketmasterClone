@@ -5,9 +5,9 @@ import com.ticketmaster.booking.BookingRepository;
 import com.ticketmaster.booking.BookingService;
 import com.ticketmaster.booking.BookingStatus;
 import com.ticketmaster.booking.exception.InvalidBookingStateException;
-import jakarta.transaction.Transactional;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.NoSuchElementException;

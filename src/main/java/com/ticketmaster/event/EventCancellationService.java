@@ -8,9 +8,9 @@ import com.ticketmaster.event.exception.EventAlreadyCancelledException;
 import com.ticketmaster.payment.PaymentService;
 import com.ticketmaster.queue.QueueService;
 import com.ticketmaster.ticket.TicketService;
-import jakarta.transaction.Transactional;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.NoSuchElementException;
