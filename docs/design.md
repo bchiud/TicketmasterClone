@@ -336,3 +336,16 @@ The access token itself carries a TTL (e.g. 10 min). If an admitted user doesn't
 - The Redis sorted set is small (a token + timestamp per user) and lives in memory — it absorbs millions of entries cheaply.
 - Partition the queue **per event** so one blockbuster doesn't starve every other on-sale.
 - The admitter is a simple, horizontally-stateless loop reading the rate limit from config, so you can retune live during an incident.
+
+### 11.5 Escape hatch — skipping the queue when it's empty
+
+The queue only earns its latency under contention. For a low-traffic event, making every arrival wait
+for the next admit tick is bad UX — you'd wait seconds to book an event nobody else wants. So:
+
+- **While the backlog is empty**, arrivals are fast-tracked straight to `ADMITTED` and skip the line.
+- **Capped:** at most `admit-rate` arrivals skip per admit window; once that's hit — or a backlog
+  forms — everyone else falls through to the normal queue, so a real spike is still throttled onto
+  the DB. The hatch reopens once the window lapses and the backlog has drained.
+- **Must be atomic:** concurrent arrivals race on "is the queue empty *and* are we under the cap?",
+  so the check-and-admit is one atomic operation — otherwise two could both see an empty queue and
+  over-admit.

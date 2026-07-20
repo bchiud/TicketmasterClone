@@ -24,6 +24,8 @@ public class QueueService {
     @Autowired
     private RedisScript<List> admitCleanupScript;
     @Autowired
+    private RedisScript<Long> emptyQueueScript;
+    @Autowired
     private RedisScript<Long> enqueueScript;
     @Autowired
     private EventService eventService;
@@ -40,6 +42,8 @@ public class QueueService {
     private long enqueueLimit;
     @Value("${queue.enqueue-window-ms}")
     private long enqueueWindowMs;
+    @Value("${queue.grant-access-window-minutes}")
+    private long grantAccessWindowMins;
 
     public String enqueue(Long eventId, String clientIp) {
         Long enqueues = stringRedisTemplate.execute(rateLimitScript,
@@ -53,27 +57,26 @@ public class QueueService {
         String eventKey = getEventKey(eventId);
         String token = UUID.randomUUID().toString();
 
-        Long queueSize = stringRedisTemplate.opsForZSet().zCard(eventKey);
-        // escape hatch for empty queue
-        if (queueSize == null || queueSize == 0) {
-            String eventAdmittedCountKey = getEventAdmittedCountKey(eventKey);
-            Long admittedCount = stringRedisTemplate.opsForValue().increment(eventAdmittedCountKey);
-            // window self-clears every admitIntervalMs so the escape hatch reopens once traffic calms down
-            if (admittedCount == 1)
-                stringRedisTemplate.expire(eventAdmittedCountKey, Duration.ofMillis(admitIntervalMs));
+        // ues long
+        // lua booleans don't round-trip symmetrically through redis's reply protocol:
+        // - return true → redis integer 1 ✓
+        // - return false → redis nil (a null reply) — not 0
+        Long isGrantedAccess = stringRedisTemplate.execute(emptyQueueScript,
+                                                           List.of(eventKey,
+                                                                   getEventAdmittedCountKey(eventKey),
+                                                                   getAccessKey(eventId, token)),
+                                                           String.valueOf(admitRate),
+                                                           String.valueOf(admitIntervalMs),
+                                                           String.valueOf(Duration.ofMinutes(grantAccessWindowMins)
+                                                                                  .toMillis()));
 
-            if (admittedCount <= admitRate) {
-                grantAccess(eventId, token);
-                return token;
-            }
-        }
-
-        // atomic via lua script so admit()'s cleanup can never observe this event registered but not yet queued (or
-        // vice versa)
-        stringRedisTemplate.execute(enqueueScript,
-                                    List.of(ACTIVE_EVENTS_KEY, getEventQueueSequenceKey(eventKey), eventKey),
-                                    eventId.toString(),
-                                    token);
+        if (isGrantedAccess == 0L)
+            // atomic via lua script so admit()'s cleanup can never observe this event registered but not yet queued (or
+            // vice versa)
+            stringRedisTemplate.execute(enqueueScript,
+                                        List.of(ACTIVE_EVENTS_KEY, getEventQueueSequenceKey(eventKey), eventKey),
+                                        eventId.toString(),
+                                        token);
         return token;
     }
 
@@ -147,10 +150,6 @@ public class QueueService {
             // unlink removes key instantly, and memory is freed in background
             if (!batch.isEmpty()) stringRedisTemplate.unlink(batch);
         }
-    }
-
-    private void grantAccess(Long eventId, String token) {
-        stringRedisTemplate.opsForValue().set(getAccessKey(eventId, token), "1", Duration.ofMinutes(10));
     }
 
     private String getAccessKeyPrefix(Long eventId) {

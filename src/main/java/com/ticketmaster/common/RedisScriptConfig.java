@@ -10,6 +10,11 @@ import java.util.List;
 @Configuration
 public class RedisScriptConfig {
     @Bean
+    public RedisScript<Long> emptyQueueScript() {
+        return RedisScript.of(new ClassPathResource("scripts/emptyQueue.lua"), Long.class);
+    }
+
+    @Bean
     public RedisScript<Long> enqueueScript() {
         return RedisScript.of(new ClassPathResource("scripts/enqueue.lua"), Long.class);
     }
