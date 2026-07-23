@@ -349,3 +349,5 @@ for the next admit tick is bad UX — you'd wait seconds to book an event nobody
 - **Must be atomic:** concurrent arrivals race on "is the queue empty *and* are we under the cap?",
   so the check-and-admit is one atomic operation — otherwise two could both see an empty queue and
   over-admit.
+- **One script, not two:** the admit decision and the enqueue are the same atomic step. Kept apart,
+  a window-boundary counter reset could fast-track a latecomer ahead of an arrival that's mid-enqueue.

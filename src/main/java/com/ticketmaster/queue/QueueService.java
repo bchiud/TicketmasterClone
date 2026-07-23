@@ -24,9 +24,7 @@ public class QueueService {
     @Autowired
     private RedisScript<List> admitCleanupScript;
     @Autowired
-    private RedisScript<Long> emptyQueueScript;
-    @Autowired
-    private RedisScript<Long> enqueueScript;
+    private RedisScript<Long> admitOrEnqueueScript;
     @Autowired
     private EventService eventService;
     @Autowired
@@ -57,26 +55,26 @@ public class QueueService {
         String eventKey = getEventKey(eventId);
         String token = UUID.randomUUID().toString();
 
-        // ues long
+        // atomic via lua script so admit()'s cleanup can never observe this event registered but not yet queued (or
+        // vice versa)
+
+        // use long
         // lua booleans don't round-trip symmetrically through redis's reply protocol:
         // - return true → redis integer 1 ✓
         // - return false → redis nil (a null reply) — not 0
-        Long isGrantedAccess = stringRedisTemplate.execute(emptyQueueScript,
+        Long isGrantedAccess = stringRedisTemplate.execute(admitOrEnqueueScript,
                                                            List.of(eventKey,
                                                                    getEventAdmittedCountKey(eventKey),
-                                                                   getAccessKey(eventId, token)),
+                                                                   getAccessKey(eventId, token),
+                                                                   ACTIVE_EVENTS_KEY,
+                                                                   getEventQueueSequenceKey(eventKey)),
                                                            String.valueOf(admitRate),
                                                            String.valueOf(admitIntervalMs),
                                                            String.valueOf(Duration.ofMinutes(grantAccessWindowMins)
-                                                                                  .toMillis()));
+                                                                                  .toMillis()),
+                                                           eventId.toString(),
+                                                           token);
 
-        if (isGrantedAccess == 0L)
-            // atomic via lua script so admit()'s cleanup can never observe this event registered but not yet queued (or
-            // vice versa)
-            stringRedisTemplate.execute(enqueueScript,
-                                        List.of(ACTIVE_EVENTS_KEY, getEventQueueSequenceKey(eventKey), eventKey),
-                                        eventId.toString(),
-                                        token);
         return token;
     }
 
