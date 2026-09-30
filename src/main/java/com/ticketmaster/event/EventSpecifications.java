@@ -7,7 +7,9 @@ import java.time.ZonedDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
-public class EventSpecifications {
+public final class EventSpecifications {
+    private EventSpecifications() {}
+
     public static Specification<Event> matching(String name,
                                                 EventStatus status,
                                                 String city,
