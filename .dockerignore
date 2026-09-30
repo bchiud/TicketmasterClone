@@ -1,0 +1,12 @@
+# Only pom.xml and src/ are copied into the build; keep everything else out of the context.
+.git
+.idea
+.vscode
+.claude
+.mvn
+target
+docs
+scripts
+*.iml
+.DS_Store
+.env

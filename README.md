@@ -14,6 +14,7 @@ A backend for the classic "design a ticket booking system" problem — see
   the operations that need to be atomic
 - Maven (via `./mvnw`)
 - JaCoCo for test coverage reporting
+- Docker Compose for a one-command local stack (app + Postgres + Redis)
 
 ## Prerequisites
 
@@ -69,6 +70,21 @@ limiting), and admin teardown.
 A `prod` profile (`src/main/resources/application-prod.properties`) is also available for
 deployment behind a trusted reverse proxy — it enables `X-Forwarded-For` handling so the per-IP
 enqueue rate limiter sees real client IPs rather than the proxy's.
+
+### Running with Docker
+
+No local Java, Postgres, or Redis needed — only Docker:
+
+```bash
+docker compose up --build    # app on http://localhost:8080
+docker compose down          # stop; add -v to also delete the Postgres volume
+```
+
+`compose.yaml` starts Postgres 15 and Redis 8 alongside the app and points the app at them
+through `SPRING_DATASOURCE_*` / `SPRING_DATA_REDIS_HOST` environment variables, which override
+the `localhost` defaults in `application.properties`. Postgres and Redis aren't published to the
+host, so the stack doesn't collide with locally installed instances. The image build skips tests
+(they need a live database); run them with `./mvnw test`.
 
 ## Testing
 

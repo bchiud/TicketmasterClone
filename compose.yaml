@@ -1,0 +1,46 @@
+# Runs the app with its Postgres and Redis dependencies: docker compose up --build
+#
+# The credentials below are for this local stack only. Postgres and Redis are not
+# published to the host, so they don't collide with a locally installed instance.
+services:
+  postgres:
+    image: postgres:15
+    environment:
+      POSTGRES_DB: ticketmaster
+      POSTGRES_USER: ticketmaster
+      POSTGRES_PASSWORD: ticketmaster
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ticketmaster -d ticketmaster"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  redis:
+    image: redis:8
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  app:
+    build: .
+    ports:
+      - "8080:8080"
+    # Spring Boot maps these env vars onto spring.datasource.* and spring.data.redis.*,
+    # overriding the localhost defaults in application.properties.
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/ticketmaster
+      SPRING_DATASOURCE_USERNAME: ticketmaster
+      SPRING_DATASOURCE_PASSWORD: ticketmaster
+      SPRING_DATA_REDIS_HOST: redis
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+volumes:
+  pgdata:
