@@ -81,7 +81,7 @@ public class BookingService {
             // 4. lock ticket rows on read
             // TicketRepository.findByIdIn is annotated with @Lock(LockModeType.PESSIMISTIC_WRITE)
             List<Ticket> tickets = ticketRepository.findByIdIn(ticketIds);
-            if (tickets.size() != ticketIds.size()) throw new TicketUnavailableException();
+            if (tickets.size() != ticketIds.size()) throw new TicketUnavailableException("One or more requested tickets not found");
 
             // 5. validate availability
             for (Ticket ticket : tickets)

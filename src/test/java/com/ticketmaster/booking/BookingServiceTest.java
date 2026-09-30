@@ -176,7 +176,8 @@ class BookingServiceTest {
 
         assertThatThrownBy(() ->
                                    bookingService.hold(user.getId(), event.getId(), List.of(999L), "idem-5", null))
-                .isInstanceOf(TicketUnavailableException.class);
+                .isInstanceOf(TicketUnavailableException.class)
+                .hasMessage("One or more requested tickets not found"); // body of the 409 response
     }
 
     @Test
