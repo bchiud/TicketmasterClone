@@ -34,6 +34,7 @@ import java.util.NoSuchElementException;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.tuple;
 
 @DataJpaTest
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
@@ -181,5 +182,69 @@ class PaymentServiceTest {
 
         assertThatThrownBy(() -> paymentService.pay(booking.getId()))
                 .isInstanceOf(InvalidBookingStateException.class);
+    }
+
+    @Test
+    void refundsAConfirmedBookingAndCancelsIt() {
+        User user = saveUser();
+        Event event = saveEvent();
+        Ticket ticket = saveTicket(event, "1", 150);
+        Booking booking = bookingService.hold(user.getId(), event.getId(), List.of(ticket.getId()), "refund-idem-1", null);
+        paymentService.pay(booking.getId());
+
+        Booking refunded = paymentService.refund(booking.getId());
+
+        assertThat(refunded.getStatus()).isEqualTo(BookingStatus.CANCELLED);
+        // the original charge stays; a separate REFUNDED row mirrors its amount
+        assertThat(paymentRepository.findByBookingId(booking.getId()))
+                .extracting(Payment::getStatus, Payment::getAmountCents)
+                .containsExactlyInAnyOrder(
+                        tuple(PaymentStatus.SUCCEEDED, 150),
+                        tuple(PaymentStatus.REFUNDED, 150));
+        assertThat(ticketRepository.findById(ticket.getId()))
+                .get()
+                .extracting(Ticket::getStatus)
+                .isEqualTo(TicketStatus.AVAILABLE);
+    }
+
+    // only SUCCEEDED charges are refunded - a FAILED attempt never moved money, so refunding it
+    // would pay the customer back more than they paid
+    @Test
+    void refundSkipsPaymentsThatDidNotSucceed() {
+        User user = saveUser();
+        Event event = saveEvent();
+        Ticket ticket = saveTicket(event, "1", 150);
+        Booking booking = bookingService.hold(user.getId(), event.getId(), List.of(ticket.getId()), "refund-idem-2", null);
+        Payment failed = new Payment();
+        failed.setBooking(booking);
+        failed.setAmountCents(150);
+        failed.setStatus(PaymentStatus.FAILED);
+        paymentRepository.save(failed);
+        paymentService.pay(booking.getId());
+
+        paymentService.refund(booking.getId());
+
+        assertThat(paymentRepository.findByBookingId(booking.getId()))
+                .filteredOn(payment -> payment.getStatus() == PaymentStatus.REFUNDED)
+                .hasSize(1);
+    }
+
+    @Test
+    void throwsWhenRefundingAPendingBooking() {
+        User user = saveUser();
+        Event event = saveEvent();
+        Ticket ticket = saveTicket(event, "1", 150);
+        Booking booking = bookingService.hold(user.getId(), event.getId(), List.of(ticket.getId()), "refund-idem-3", null);
+
+        assertThatThrownBy(() -> paymentService.refund(booking.getId()))
+                .isInstanceOf(InvalidBookingStateException.class);
+        // nothing was paid, so nothing may be refunded
+        assertThat(paymentRepository.findByBookingId(booking.getId())).isEmpty();
+    }
+
+    @Test
+    void throwsWhenRefundingANonexistentBooking() {
+        assertThatThrownBy(() -> paymentService.refund(999L))
+                .isInstanceOf(NoSuchElementException.class);
     }
 }

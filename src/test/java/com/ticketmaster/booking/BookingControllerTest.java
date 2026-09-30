@@ -7,11 +7,13 @@ import com.ticketmaster.queue.exception.QueueAccessRequiredException;
 import com.ticketmaster.seat.Seat;
 import com.ticketmaster.ticket.Ticket;
 import com.ticketmaster.ticket.TicketStatus;
+import com.ticketmaster.ticket.exception.TicketLimitedExceededException;
 import com.ticketmaster.ticket.exception.TicketUnavailableException;
 import com.ticketmaster.user.User;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import tools.jackson.databind.ObjectMapper;
@@ -151,6 +153,24 @@ class BookingControllerTest {
     }
 
     @Test
+    void holdBookingReturns409WhenTicketLimitExceeded() throws Exception {
+        when(bookingService.hold(anyLong(), anyLong(), any(), any(), any()))
+                .thenThrow(new TicketLimitedExceededException("Maximum number of tickets per user exceeded"));
+
+        BookingHoldRequest request = new BookingHoldRequest();
+        request.setUserId(1L);
+        request.setEventId(2L);
+        request.setTicketIds(List.of(3L));
+        request.setIdempotencyKey("idem-limit");
+
+        mockMvc.perform(post("/bookings/hold")
+                                .contentType("application/json")
+                                .content(objectMapper.writeValueAsString(request)))
+               .andExpect(status().isConflict())
+               .andExpect(content().string("Maximum number of tickets per user exceeded"));
+    }
+
+    @Test
     void holdBookingReturns403WhenQueueAccessRequired() throws Exception {
         when(bookingService.hold(anyLong(), anyLong(), any(), any(), any()))
                 .thenThrow(new QueueAccessRequiredException("Access Denied"));
@@ -221,6 +241,17 @@ class BookingControllerTest {
 
         mockMvc.perform(post("/bookings/1/pay"))
                .andExpect(status().isConflict());
+    }
+
+    // Booking is @Version-ed: a pay racing a cancel on the same row surfaces as an optimistic-lock
+    // failure, which the API must report as a retryable 409 rather than a 500
+    @Test
+    void payBookingReturns409OnConcurrentModification() throws Exception {
+        when(paymentService.pay(1L)).thenThrow(new ObjectOptimisticLockingFailureException(Booking.class, 1L));
+
+        mockMvc.perform(post("/bookings/1/pay"))
+               .andExpect(status().isConflict())
+               .andExpect(content().string("Resource was modified concurrently, please retry"));
     }
 
     @Test

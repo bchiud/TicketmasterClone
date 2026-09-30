@@ -4,6 +4,9 @@ import com.ticketmaster.venue.Venue;
 import com.ticketmaster.venue.VenueRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.NullSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
 import org.springframework.boot.jdbc.test.autoconfigure.AutoConfigureTestDatabase;
@@ -130,5 +133,21 @@ class EventSpecificationsTest {
         // NY + ON_SALE -> only Jazz Night (Jazz Brunch is NY but SCHEDULED)
         assertThat(names(find(EventStatus.ON_SALE, "new york", null, null, null)))
                 .containsExactly("Jazz Night " + token);
+    }
+
+    // blank strings (e.g. an empty ?city= query param) mean "no filter", not "match empty"
+    @Test
+    void blankCityAndPerformerAreIgnored() {
+        assertThat(find(null, "  ", "", null, null)).hasSize(3);
+    }
+
+    @ParameterizedTest
+    @NullSource
+    @ValueSource(strings = {"", " "})
+    void nullOrBlankNameIsIgnored(String name) {
+        // no name drops the token scope, so this spans the whole shared DB - assert only that our
+        // rows are included, not an exact count
+        List<Event> all = eventRepository.findAll(EventSpecifications.matching(name, null, null, null, null, null));
+        assertThat(names(all)).contains("Jazz Night " + token, "Rock Fest " + token, "Jazz Brunch " + token);
     }
 }

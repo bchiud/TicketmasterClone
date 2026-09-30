@@ -34,6 +34,7 @@ import java.util.NoSuchElementException;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 @DataJpaTest
@@ -267,6 +268,21 @@ class BookingServiceTest {
         assertThatThrownBy(() -> bookingService.hold(
                 user.getId(), event.getId(), List.of(ticket.getId()), "idem-queue-3", null))
                 .isInstanceOf(QueueAccessRequiredException.class);
+    }
+
+    // a whitespace-only token is rejected up front, without a Redis lookup
+    @Test
+    void throwsWhenEventRequiresQueueAndAccessTokenBlank() {
+        User user = saveUser();
+        Event event = saveEvent();
+        event.setRequiresQueue(true);
+        eventRepository.save(event);
+        Ticket ticket = saveTicket(event, "1", 100);
+
+        assertThatThrownBy(() -> bookingService.hold(
+                user.getId(), event.getId(), List.of(ticket.getId()), "idem-queue-4", "   "))
+                .isInstanceOf(QueueAccessRequiredException.class);
+        verifyNoInteractions(queueService);
     }
 
     @Test

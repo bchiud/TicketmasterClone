@@ -7,6 +7,7 @@ import com.ticketmaster.event.exception.EventNotOnSaleException;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.data.redis.core.RedisCallback;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.test.context.TestPropertySource;
 
@@ -233,6 +234,24 @@ class QueueServiceTest {
         assertThat(stringRedisTemplate.hasKey(q + ":admitted-count")).isFalse();
         assertThat(stringRedisTemplate.keys("access:" + eventId + ":*")).isEmpty();
         assertThat(queueService.hasAccess(eventId, fastTracked)).isFalse();
+    }
+
+    // purgeEvent() unlinks access keys in chunks of 1000. Exactly 1000 keys fills one chunk, so it
+    // exercises the in-loop flush and then the empty-remainder skip after the loop.
+    @Test
+    void purgeEventRemovesAccessKeysInFullBatches() {
+        Long eventId = uniqueEventId();
+        String prefix = "access:" + eventId + ":";
+        stringRedisTemplate.executePipelined((RedisCallback<Object>) connection -> {
+            for (int i = 0; i < 1000; i++)
+                connection.stringCommands().set((prefix + i).getBytes(), "1".getBytes());
+            return null;
+        });
+        assertThat(stringRedisTemplate.keys(prefix + "*")).hasSize(1000); // sanity
+
+        queueService.purgeEvent(eventId);
+
+        assertThat(stringRedisTemplate.keys(prefix + "*")).isEmpty();
     }
 
     @Test

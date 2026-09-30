@@ -1,5 +1,7 @@
 package com.ticketmaster.queue;
 
+import com.ticketmaster.event.exception.EventNotOnSaleException;
+import com.ticketmaster.queue.exception.RateLimitException;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
@@ -30,6 +32,24 @@ class QueueControllerTest {
         mockMvc.perform(post("/events/42/queue"))
                .andExpect(status().isOk())
                .andExpect(content().string("token-abc"));
+    }
+
+    @Test
+    void enqueueReturns429WhenRateLimited() throws Exception {
+        when(queueService.enqueue(eq(42L), anyString())).thenThrow(new RateLimitException("Rate limit exceeded"));
+
+        mockMvc.perform(post("/events/42/queue"))
+               .andExpect(status().isTooManyRequests())
+               .andExpect(content().string("Rate limit exceeded"));
+    }
+
+    @Test
+    void enqueueReturns409WhenEventNotOnSale() throws Exception {
+        when(queueService.enqueue(eq(42L), anyString())).thenThrow(new EventNotOnSaleException("Event not on sale: 42"));
+
+        mockMvc.perform(post("/events/42/queue"))
+               .andExpect(status().isConflict())
+               .andExpect(content().string("Event not on sale: 42"));
     }
 
     @Test
