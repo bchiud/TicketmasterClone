@@ -161,8 +161,9 @@ conscious trade-off, not an oversight:
   each sweep N times. It's currently safe-ish, since each has an independent guard:
   - queue admission pops via atomic Lua `ZPOPMIN`, so instances split the work rather than
     double-admit;
-  - expiry mutates each booking under its `@Version` optimistic lock, so a concurrent second
-    sweep loses cleanly;
+  - expiry re-checks that each reloaded booking is still `PENDING` and mutates it under its
+    `@Version` optimistic lock, so a concurrent second sweep (or a payment landing mid-sweep)
+    loses cleanly;
   - on-sale activation is idempotent (`SCHEDULED → ON_SALE` twice is harmless).
   - *Next:* a distributed lock (ShedLock's `@SchedulerLock`, backed by the existing Redis) or
     leader election, so each sweep runs once cluster-wide instead of relying on per-operation

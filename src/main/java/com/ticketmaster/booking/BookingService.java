@@ -16,6 +16,7 @@ import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.dao.ConcurrencyFailureException;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
@@ -81,7 +82,8 @@ public class BookingService {
             // 4. lock ticket rows on read
             // TicketRepository.findByIdIn is annotated with @Lock(LockModeType.PESSIMISTIC_WRITE)
             List<Ticket> tickets = ticketRepository.findByIdIn(ticketIds);
-            if (tickets.size() != ticketIds.size()) throw new TicketUnavailableException("One or more requested tickets not found");
+            if (tickets.size() != ticketIds.size())
+                throw new TicketUnavailableException("One or more requested tickets not found");
 
             // 5. validate availability
             for (Ticket ticket : tickets)
@@ -114,7 +116,7 @@ public class BookingService {
         });
     }
 
-    // single owned aggregate (booking) -> optimistic locking for confirm / pay / cancel flow
+    // single owned aggregate (booking) -> optimistic locking for confirm / cancel / expire flow
     @Transactional
     public Booking confirm(long bookingId) {
         Booking booking = bookingRepository.findById(bookingId)
@@ -156,6 +158,15 @@ public class BookingService {
                     Booking attachedBooking = bookingRepository.findById(booking.getId())
                                                                .orElseThrow(() -> new NoSuchElementException(
                                                                        "Booking not found: " + booking.getId()));
+                    // payment/cancel may commit between the sweep query and this reload
+                    // reload reads its new @Version, so optimistic locking can't catch it -> re-check status
+                    if (attachedBooking.getStatus() != BookingStatus.PENDING) {
+                        log.info("Skipped expiring booking {}: status now {}",
+                                 booking.getId(),
+                                 attachedBooking.getStatus());
+                        return null;
+                    }
+
                     attachedBooking.setStatus(BookingStatus.EXPIRED);
                     for (Ticket ticket : attachedBooking.getTickets()) {
                         ticket.setStatus(TicketStatus.AVAILABLE);
@@ -165,6 +176,8 @@ public class BookingService {
                     // thus no need to explicitly call repository.save()
                     return null;
                 });
+            } catch (ConcurrencyFailureException e) {
+                log.info("Skipped expiring booking {}: modified concurrently", booking.getId());
             } catch (Exception e) {
                 log.error("Failed to expire booking {}", booking.getId(), e);
             }

@@ -198,8 +198,10 @@ return 'OK'
 Redis is the fast gatekeeper; the DB is still written asynchronously as the durable record. If Redis says OK, persist
 the hold to the DB; if the DB write fails, release the Redis keys.
 
-> **Implemented: Option A (§9.2)** — a pessimistic `SELECT … FOR UPDATE NOWAIT` on the ticket rows
-> (`TicketRepository.findByIdIn`, `@Lock(PESSIMISTIC_WRITE)`) in `BookingService.hold()`. Redis is
+> **Implemented: Option A (§9.2)** — a pessimistic row lock on the ticket rows in `BookingService.hold()`
+> (`TicketRepository.findByIdIn`, `@Lock(PESSIMISTIC_WRITE)` + `lock.timeout=0`), which Hibernate 7 emits on
+> Postgres as `SELECT … FOR NO KEY UPDATE NOWAIT`: still exclusive between two holds, but it doesn't block
+> inserts that only reference the row by foreign key. Redis is
 > used only for the queue and admission tokens (§11), not seat holds.
 >
 > **Option B (§9.3, Redis seat holds) is deferred, not replaced by §11** — they attack a hot event
@@ -223,7 +225,9 @@ the hold to the DB; if the DB write fails, release the Redis keys.
   on read) that finds `PENDING` bookings whose `expires_at < now()` and, one transaction per booking, flips the
   booking → `EXPIRED` and its tickets back to `AVAILABLE`. The hold window lives on the **booking** (
   `bookings.expires_at`), so the sweep is booking-level — tickets carry no per-ticket expiry column.
-  Belt-and-suspenders: always re-check `expires_at` at confirm time so a slow sweeper can't cause a double-sell.
+  Both sides re-check: confirm re-checks `expires_at` so a late payment can't confirm a stale hold, and the sweep
+  re-checks `status = PENDING` after reloading each booking so a payment that commits mid-sweep isn't expired (the
+  reload reads the new `version`, so optimistic locking alone can't catch it).
 
 ### 9.5 Idempotency
 
@@ -252,7 +256,7 @@ transaction.
 transition a *single owned aggregate*.
 
 The loser surfaces as a Spring `ObjectOptimisticLockingFailureException` (optimistic) or `CannotAcquireLockException` (
-the pessimistic `FOR UPDATE NOWAIT` loser). Both are subtypes of `ConcurrencyFailureException`, which
+the pessimistic `FOR NO KEY UPDATE NOWAIT` loser). Both are subtypes of `ConcurrencyFailureException`, which
 `ApiExceptionHandler` maps to **409 Conflict** ("modified concurrently, please retry") rather than a 500.
 
 ## 10. Database Schema

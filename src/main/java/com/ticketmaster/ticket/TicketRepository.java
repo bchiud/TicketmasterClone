@@ -13,8 +13,9 @@ public interface TicketRepository extends JpaRepository<Ticket, Long> {
 
     List<Ticket> findByEventIdAndStatus(Long eventId, TicketStatus status);
 
-    // pessimistic write: lock "SELECT FOR UPDATE"
-    // optimistic write: check for changes right before committing
+    // pessimistic write: postgres "FOR NO KEY UPDATE NOWAIT"
+    // (java) lock.timeout = 0 -> don't wait for the lock
+    // row lock held until commit; second hold on the same ticket fails immediately instead of waiting
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @QueryHints(@QueryHint(name = "jakarta.persistence.lock.timeout", value = "0"))
     List<Ticket> findByIdIn(List<Long> ids);
