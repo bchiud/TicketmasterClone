@@ -95,6 +95,23 @@ host, so the stack doesn't collide with locally installed instances. The image b
 
 Coverage report: `target/site/jacoco/index.html` after `verify`.
 
+## Load test
+
+[`loadtest/`](loadtest/README.md) drives the running app over HTTP, then checks PostgreSQL for
+oversells. Results from the saved runs:
+
+| Scenario | Result |
+|---|---|
+| On-sale spike: 500–5,000 buyers arrive at once for 200 seats (13 sell-outs) | **0 seats sold twice**: 2,600 confirmed bookings = 2,600 booked tickets = 2,600 payments; 0 server errors |
+| Waiting room at 5,000 buyers | all admitted within 9.85 s at the configured 500/s; 0 server errors |
+| Hot seat: 100 or 500 buyers hold the same ticket at once (70 rounds) | exactly 1 winner in every round; every loser gets `409` |
+| Per-IP rate limit (5 joins per 10 s) | one IP sending 50 joins gets 5 × `200` and 45 × `429`; 50 other IPs all get `200` |
+
+Everything ran on one laptop (Apple M5) over localhost, with a single Python client that tops out
+around 3k req/s, so throughput figures are a lower bound on the server. The run also surfaced
+several bugs, listed under
+[Findings](loadtest/README.md#findings-from-running-it).
+
 ## Project Structure
 
 Package-by-feature, one package per domain concept:

@@ -9,8 +9,10 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.data.redis.core.RedisCallback;
 import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.data.redis.core.script.RedisScript;
 import org.springframework.test.context.TestPropertySource;
 
+import java.util.List;
 import java.util.NoSuchElementException;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -38,6 +40,10 @@ class QueueServiceTest {
 
     @Autowired
     private StringRedisTemplate stringRedisTemplate;
+
+    // wildcard so the test doesn't depend on the script's declared result type; resolved by field name
+    @Autowired
+    private RedisScript<?> admitCleanupScript;
 
     @Autowired
     private EventRepository eventRepository;
@@ -274,5 +280,33 @@ class QueueServiceTest {
                 .isEqualTo(0);
         assertThat(queueService.checkStatus(eventId, "bogus-token").getQueueStatus())
                 .isEqualTo(QueueStatus.INVALID);
+    }
+
+    // admitCleanup.lua must grant access in the same atomic step as its ZPOPMIN. When the access-key SETs
+    // ran in a Java loop after the script, a status poll landing in between found the token in neither the
+    // queue nor the access keys and got INVALID (the load test saw up to 738 of 2,000 buyers hit this).
+    // Running only the script, with none of admit()'s Java code, pins that the grant lives inside it.
+    @Test
+    void admitScriptGrantsAccessInTheSameStepAsThePop() {
+        Long eventId = uniqueEventId();
+        queueService.enqueue(eventId, IP); // escape hatch slot 1
+        queueService.enqueue(eventId, IP); // escape hatch slot 2 (admit-rate=2)
+        String first = queueService.enqueue(eventId, IP);
+        String second = queueService.enqueue(eventId, IP);
+        String waiting = queueService.enqueue(eventId, IP);
+
+        // same arguments admit() passes: admit rate, event id, access-key prefix, access TTL in ms
+        stringRedisTemplate.execute(admitCleanupScript,
+                                    List.of("queue:" + eventId, "queue:active-events"),
+                                    "2", eventId.toString(), "access:" + eventId + ":", "600000");
+
+        for (String token : List.of(first, second)) {
+            assertThat(queueService.getPosition(eventId, token)).isNull();
+            assertThat(queueService.hasAccess(eventId, token)).isTrue();
+            // a TTL, so admission can't become a permanent pass
+            assertThat(stringRedisTemplate.getExpire("access:" + eventId + ":" + token)).isPositive();
+        }
+        assertThat(queueService.hasAccess(eventId, waiting)).isFalse();
+        assertThat(queueService.getPosition(eventId, waiting)).isEqualTo(0);
     }
 }

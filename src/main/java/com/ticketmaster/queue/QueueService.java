@@ -2,6 +2,7 @@ package com.ticketmaster.queue;
 
 import com.ticketmaster.event.EventService;
 import com.ticketmaster.queue.exception.RateLimitException;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.core.Cursor;
@@ -18,11 +19,12 @@ import java.util.Set;
 import java.util.UUID;
 
 @Service
+@Slf4j
 public class QueueService {
     private static final String ACTIVE_EVENTS_KEY = "queue:active-events";
 
     @Autowired
-    private RedisScript<List> admitCleanupScript;
+    private RedisScript<Long> admitCleanupScript;
     @Autowired
     private RedisScript<Long> admitOrEnqueueScript;
     @Autowired
@@ -90,19 +92,14 @@ public class QueueService {
         for (String eventId : activeEvents) {
             String eventKey = getEventKey(Long.valueOf(eventId));
 
-            List<String> popped = stringRedisTemplate.execute(admitCleanupScript,
-                                                              List.of(eventKey, ACTIVE_EVENTS_KEY),
-                                                              String.valueOf(admitRate),
-                                                              eventId);
-
-            // ZPOPMIN's flat reply alternates member/score - popped[i] is the token, popped[i+1] its sequence number
-            for (int i = 0; i < popped.size(); i += 2) {
-                String token = popped.get(i);
-                stringRedisTemplate.opsForValue()
-                                   .set(getAccessKey(Long.valueOf(eventId), token),
-                                        "1",
-                                        Duration.ofMinutes(grantAccessWindowMins));
-            }
+            Long admitted = stringRedisTemplate.execute(admitCleanupScript,
+                                                        List.of(eventKey, ACTIVE_EVENTS_KEY),
+                                                        String.valueOf(admitRate),
+                                                        eventId,
+                                                        getAccessKeyPrefix(Long.valueOf(eventId)),
+                                                        String.valueOf(Duration.ofMinutes(grantAccessWindowMins)
+                                                                               .toMillis()));
+            log.debug("Admitted {} for event {}", admitted, eventId);
         }
     }
 

@@ -5,8 +5,6 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.data.redis.core.script.RedisScript;
 
-import java.util.List;
-
 @Configuration
 public class RedisScriptConfig {
     @Bean
@@ -15,8 +13,8 @@ public class RedisScriptConfig {
     }
 
     @Bean
-    public RedisScript<List> admitCleanupScript() {
-        return RedisScript.of(new ClassPathResource("scripts/admitCleanup.lua"), List.class);
+    public RedisScript<Long> admitCleanupScript() {
+        return RedisScript.of(new ClassPathResource("scripts/admitCleanup.lua"), Long.class);
     }
 
     @Bean

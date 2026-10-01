@@ -81,14 +81,17 @@ defaults to `http://localhost:8080`. Pass `--offline` to `uv run` if PyPI isn't 
 - The app runs with its defaults: Hikari pool 10, Tomcat 200 threads, `queue.admit-rate=500`
   per 1s.
 
-## Findings from running it (production code unchanged)
+## Findings from running it
 
-- **Transient `INVALID` from the queue-status poll.** `QueueService.admit()` pops tokens
-  atomically in Lua (`admitCleanup.lua`), then sets each token's access key in a separate
-  Java loop (`QueueService.java:99-104`). A poll that lands between the two finds the token in
-  neither place and returns `INVALID` (`QueueService.java:110-115`). The client counts these and
-  keeps polling. In most runs, some buyers went `INVALID` → `ADMITTED`, up to 738 of 2,000.
-  A client that treats `INVALID` as terminal would drop them.
+The run used unchanged production code. Fixes made since are marked **Fixed**.
+
+- **Transient `INVALID` from the queue-status poll. Fixed.** `QueueService.admit()` popped tokens
+  atomically in Lua (`admitCleanup.lua`), then set each token's access key in a separate Java
+  loop. A poll that landed between the two found the token in neither place and got `INVALID`
+  from `checkStatus()`. In most runs, some buyers went `INVALID` → `ADMITTED`, up to 738 of 2,000;
+  a client that treats `INVALID` as terminal would drop them. The script now sets the access keys
+  in the same atomic step as the pop (pinned by
+  `QueueServiceTest.admitScriptGrantsAccessInTheSameStepAsThePop`).
 - **Event can stay `ON_SALE` after it sells out.** `BookingService.confirm()` calls
   `EventService.markSoldOutIfLastTicketBooked` (`EventService.java:72-78`). Two concurrent
   confirms can each still see the other's ticket as `HELD` (write skew under READ COMMITTED),
@@ -97,8 +100,8 @@ defaults to `http://localhost:8080`. Pass `--offline` to `uv run` if PyPI isn't 
   admitting fans to an event with no inventory.
 - **Hibernate emits `FOR NO KEY UPDATE … NOWAIT`, not `FOR UPDATE NOWAIT`.** Confirmed with
   `--logging.level.org.hibernate.SQL=DEBUG`. It's still an exclusive lock between concurrent
-  holds, which is all the double-booking guard needs. `docs/design.md` §9.2 still says
-  `FOR UPDATE NOWAIT`.
+  holds, which is all the double-booking guard needs. Fixed since: `docs/design.md` and the
+  `TicketRepository` comment now say `FOR NO KEY UPDATE NOWAIT`.
 - **`GET /events/{id}/tickets` is N+1.** The eager `@ManyToOne seat` on `Ticket` is loaded
   with one `SELECT` per ticket, so 1 + N queries per call. On a 200-ticket event it served
   ~643 req/s, against ~27k req/s for `GET /events/{id}`.
