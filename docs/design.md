@@ -220,7 +220,12 @@ the hold to the DB; if the DB write fails, release the Redis keys.
 - **Mark sold out:** after a confirm, the event flips to `SOLD_OUT` once no ticket remains that could still be sold or
   is mid-sale — i.e. no `AVAILABLE` **and** no `HELD` tickets (`BOOKED` and `CANCELLED` are both terminal). Checking "
   nothing sellable left" rather than "all BOOKED" keeps voided (`CANCELLED`) seats from blocking sold-out, and is a
-  single `COUNT` query rather than a full ticket scan.
+  single `COUNT` query rather than a full ticket scan. The check first locks and re-reads the event row
+  (`EntityManager.refresh(event, PESSIMISTIC_WRITE)`). Without the lock, two confirms for the last two seats each
+  see the other's ticket still `HELD` under READ COMMITTED and neither flips the event (write skew); with it, the
+  second waits for the first to commit and then counts 0. The re-read matters too: a plain locking query returns
+  the copy this transaction already loaded, so a cancellation committed mid-confirm would be overwritten with
+  `SOLD_OUT`.
 - **Expiry sweep:** Redis TTL handles the in-memory locks automatically. For the DB, run a periodic job (or lazy check
   on read) that finds `PENDING` bookings whose `expires_at < now()` and, one transaction per booking, flips the
   booking → `EXPIRED` and its tickets back to `AVAILABLE`. The hold window lives on the **booking** (

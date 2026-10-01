@@ -83,7 +83,8 @@ defaults to `http://localhost:8080`. Pass `--offline` to `uv run` if PyPI isn't 
 
 ## Findings from running it
 
-The run used unchanged production code. Fixes made since are marked **Fixed**.
+The first run used unchanged production code. Fixes made since are marked **Fixed**; a second run
+after them confirmed what changed.
 
 - **Transient `INVALID` from the queue-status poll. Fixed.** `QueueService.admit()` popped tokens
   atomically in Lua (`admitCleanup.lua`), then set each token's access key in a separate Java
@@ -91,13 +92,15 @@ The run used unchanged production code. Fixes made since are marked **Fixed**.
   from `checkStatus()`. In most runs, some buyers went `INVALID` → `ADMITTED`, up to 738 of 2,000;
   a client that treats `INVALID` as terminal would drop them. The script now sets the access keys
   in the same atomic step as the pop (pinned by
-  `QueueServiceTest.admitScriptGrantsAccessInTheSameStepAsThePop`).
-- **Event can stay `ON_SALE` after it sells out.** `BookingService.confirm()` calls
-  `EventService.markSoldOutIfLastTicketBooked` (`EventService.java:72-78`). Two concurrent
-  confirms can each still see the other's ticket as `HELD` (write skew under READ COMMITTED),
-  so neither flips the event. Seen on 4 of 20 sold-out events. No seat is oversold, but late
-  buyers get `409 ticket unavailable` instead of `409 not on sale`, and the waiting room keeps
-  admitting fans to an event with no inventory.
+  `QueueServiceTest.admitScriptGrantsAccessInTheSameStepAsThePop`). Second run: 0 of 80,493
+  status polls returned `INVALID`, against 2,239 in the first.
+- **Event can stay `ON_SALE` after it sells out. Fixed.** `BookingService.confirm()` calls
+  `EventService.markSoldOutIfLastTicketBooked`. Two concurrent confirms could each still see the
+  other's ticket as `HELD` (write skew under READ COMMITTED), so neither flipped the event. Seen on
+  3 of 13 sold-out events in the first run and 3 of 12 in the second. No seat was oversold, but
+  late buyers got `409 ticket unavailable` instead of `409 not on sale`, and the waiting room kept
+  admitting fans to an event with no inventory. The check now locks and re-reads the event row
+  before counting (pinned by `EventSoldOutRaceTest`); not yet re-measured under load.
 - **Hibernate emits `FOR NO KEY UPDATE … NOWAIT`, not `FOR UPDATE NOWAIT`.** Confirmed with
   `--logging.level.org.hibernate.SQL=DEBUG`. It's still an exclusive lock between concurrent
   holds, which is all the double-booking guard needs. Fixed since: `docs/design.md` and the

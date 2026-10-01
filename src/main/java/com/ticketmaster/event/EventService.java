@@ -6,6 +6,9 @@ import com.ticketmaster.ticket.TicketService;
 import com.ticketmaster.ticket.TicketStatus;
 import com.ticketmaster.venue.Venue;
 import com.ticketmaster.venue.VenueRepository;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.LockModeType;
+import jakarta.persistence.PersistenceContext;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -27,6 +30,8 @@ public class EventService {
     private TicketService ticketService;
     @Autowired
     private VenueRepository venueRepository;
+    @PersistenceContext
+    private EntityManager entityManager;
 
     @Scheduled(fixedDelayString = "${event.on-sale-sweep-interval-ms:30000}")
     public void activateOnSaleEvents() {
@@ -70,10 +75,14 @@ public class EventService {
     }
 
     public void markSoldOutIfLastTicketBooked(Event event) {
-        if (ticketRepository.countByEventIdAndStatusIn(event.getId(),
-                                                       List.of(TicketStatus.AVAILABLE, TicketStatus.HELD)) == 0) {
+        entityManager.refresh(event, LockModeType.PESSIMISTIC_WRITE);
+        if (event.getStatus() == EventStatus.ON_SALE
+            && ticketRepository.countByEventIdAndStatusIn(event.getId(),
+                                                          List.of(TicketStatus.AVAILABLE,
+                                                                  TicketStatus.HELD)) ==
+               0) {
             event.setStatus(EventStatus.SOLD_OUT);
-            eventRepository.save(event);
         }
+
     }
 }

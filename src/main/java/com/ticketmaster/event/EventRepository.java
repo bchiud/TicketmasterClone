@@ -10,11 +10,5 @@ import java.util.List;
 public interface EventRepository extends JpaRepository<Event, Long>, JpaSpecificationExecutor<Event> {
     List<Event> findByVenueId(Long venueId);
 
-    List<Event> findByStatus(EventStatus status);
-
-    List<Event> findByNameContainingIgnoreCase(String name);
-
-    List<Event> findByNameContainingIgnoreCaseAndStatus(String name, EventStatus status);
-
     List<Event> findByStatusAndOnSaleAtBefore(EventStatus status, ZonedDateTime cutoff);
 }

@@ -66,7 +66,7 @@ public class BookingService {
                 throw new QueueAccessRequiredException("Access Denied");
         }
 
-        // 2. check against booking ticket limit
+        // 3. check against booking ticket limit
         List<BookingStatus> openStatuses = new ArrayList<>(List.of(BookingStatus.PENDING, BookingStatus.CONFIRMED));
         int openTickets = bookingRepository.findByUserIdAndEventIdAndStatusIn(userId, eventId, openStatuses)
                                            .stream()
@@ -75,24 +75,24 @@ public class BookingService {
         if ((openTickets + ticketIds.size()) > maxTicketsPerUser)
             throw new TicketLimitedExceededException("Maximum number of tickets per user exceeded");
 
-        // 3. check if booking exists
+        // 4. check if booking exists
         Optional<Booking> existingBooking = bookingRepository.findByIdempotencyKey(idempotencyKey);
         return existingBooking.orElseGet(() -> {
 
-            // 4. lock ticket rows on read
+            // 5. lock ticket rows on read
             // TicketRepository.findByIdIn is annotated with @Lock(LockModeType.PESSIMISTIC_WRITE)
             List<Ticket> tickets = ticketRepository.findByIdIn(ticketIds);
             if (tickets.size() != ticketIds.size())
                 throw new TicketUnavailableException("One or more requested tickets not found");
 
-            // 5. validate availability
+            // 6. validate availability
             for (Ticket ticket : tickets)
                 if (ticket.getStatus() != TicketStatus.AVAILABLE)
                     throw new TicketUnavailableException("Ticket %d unavailable".formatted(ticket.getId()));
 
             int totalCents = tickets.stream().mapToInt(Ticket::getPriceCents).sum();
 
-            // 6. book!
+            // 7. book!
             ZonedDateTime expiresAt = ZonedDateTime.now().plusMinutes(holdWindowMinutes);
             Booking booking = new Booking();
             booking.setUser(userRepository.findById(userId)
@@ -105,7 +105,7 @@ public class BookingService {
             booking.setExpiresAt(expiresAt.toInstant());
             bookingRepository.save(booking);
 
-            // 7. hold tickets
+            // 8. hold tickets
             for (Ticket ticket : tickets) {
                 ticket.setStatus(TicketStatus.HELD);
                 ticket.setBooking(booking);

@@ -64,39 +64,4 @@ class EventRepositoryTest {
         assertThat(results.get(0)
                           .getName()).isEqualTo("Concert Night");
     }
-
-    @Test
-    void findsEventsByStatus() {
-        Venue venue = saveVenue();
-
-        Event event = new Event();
-        event.setName("On Sale Show");
-        event.setVenue(venue);
-        event.setStartsAt(ZonedDateTime.now()
-                                       .plusDays(5));
-        event.setStatus(EventStatus.ON_SALE);
-        eventRepository.save(event);
-
-        List<Event> results = eventRepository.findByStatus(EventStatus.ON_SALE);
-
-        assertThat(results).extracting(Event::getName)
-                           .contains("On Sale Show");
-    }
-
-    @Test
-    void findsEventsByNameContainingIgnoreCase() {
-        Venue venue = saveVenue();
-
-        Event event = new Event();
-        event.setName("Summer Jam Festival");
-        event.setVenue(venue);
-        event.setStartsAt(ZonedDateTime.now()
-                                       .plusDays(20));
-        eventRepository.save(event);
-
-        List<Event> results = eventRepository.findByNameContainingIgnoreCase("summer");
-
-        assertThat(results).extracting(Event::getName)
-                           .contains("Summer Jam Festival");
-    }
 }
