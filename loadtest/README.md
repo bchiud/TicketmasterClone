@@ -100,7 +100,9 @@ after them confirmed what changed.
   3 of 13 sold-out events in the first run and 3 of 12 in the second. No seat was oversold, but
   late buyers got `409 ticket unavailable` instead of `409 not on sale`, and the waiting room kept
   admitting fans to an event with no inventory. The check now locks and re-reads the event row
-  before counting (pinned by `EventSoldOutRaceTest`); not yet re-measured under load.
+  before counting (pinned by `EventSoldOutRaceTest`). A third, spike-only run after the fix: 0 of
+  12 sold-out events stuck `ON_SALE`, no deadlocks or lock timeouts on the event row, and `pay`
+  latency within the run-to-run spread of the earlier runs.
 - **Hibernate emits `FOR NO KEY UPDATE … NOWAIT`, not `FOR UPDATE NOWAIT`.** Confirmed with
   `--logging.level.org.hibernate.SQL=DEBUG`. It's still an exclusive lock between concurrent
   holds, which is all the double-booking guard needs. Fixed since: `docs/design.md` and the
